@@ -15,7 +15,7 @@
 //      740 ms per side) with 4 stereo routing modes (`PING`, `DUAL`, `MONO`, `WIDE`).
 //   4. Momentary footswitch support (`ON/OFF = LATCH / UNLATCH`).
 
-declare name "RF5CDly";
+declare name "RF5C Delay";
 declare zd2_filename "XXRF5CDL";
 declare zd2_id "07001230";
 declare version "1.00";

@@ -13,7 +13,7 @@
 //   4. All 5 Sony PS1 BIOS presets (`ROOM`, `STDO`, `HALL`, `SPCE`, `PIPE`)
 //      plus momentary footswitch throw support (`ON/OFF = LATCH / UNLATCH`).
 
-declare name "XARVB";
+declare name "XA Reverb";
 declare zd2_filename "XXXARVB";
 declare zd2_id "070011b0";
 declare version "1.00";

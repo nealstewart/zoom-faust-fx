@@ -17,7 +17,7 @@
 //      - Mid bell  (~2.5 kHz): `fi.svf_peak(2500, 1.11, g_mid)`
 //      - High shelf (~6.5 kHz): `fi.highpass1(6500)` residual boost/cut around 50
 
-declare name "DeskDrv";
+declare name "Desk Drive";
 declare zd2_filename "XXDESKDR";
 declare zd2_id "07001130";
 declare version "1.00";

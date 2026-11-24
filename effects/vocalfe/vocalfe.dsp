@@ -34,7 +34,7 @@
 //      - Lightweight Padé [3/2] rational `ma.tanh` soft clipper with input
 //        `Drive` (0..12 dB) and peak `Ceil` trim + stock Zoom `Level` output.
 
-declare name "VocalFE";
+declare name "Vocal FE";
 declare zd2_filename "XXVOCLFE";
 declare zd2_id "07001180";
 declare version "1.00";

@@ -23,7 +23,7 @@
 //      - Pitch Mul: 1.25x | P.Env: +0.35 oct | P.Env Decay: 35 ms
 //      - KS Feedback: 0.992 | KS LPF: 14,500 Hz | Comb: +0.65 (at 0.4142 * T0) | Crash: 3.20
 
-declare name "SophWg";
+declare name "Soph WG";
 declare zd2_filename "XXSOPHWG";
 declare zd2_id "070011c0";
 declare version "1.00";

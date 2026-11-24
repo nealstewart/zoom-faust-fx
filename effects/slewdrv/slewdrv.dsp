@@ -13,7 +13,7 @@
 //      Silicon Diode Clipper (`slew4_ovs` via `~` + `[1, 3, 3, 1]/8` sinc^3 decimation)
 //      plus dynamic diode-conductance modulation of the RAT Filter LPF (`dyn_rat_lpf`).
 
-declare name "SlewDrv";
+declare name "Slew Drive";
 declare zd2_filename "XXSLEWDR";
 declare zd2_id "07001120";
 declare version "1.00";

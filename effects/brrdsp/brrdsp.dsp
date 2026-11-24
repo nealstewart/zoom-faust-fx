@@ -16,7 +16,7 @@
 //   4. 4 hardware revision / output modes (`SHVC`, `1CHIP`, `RAW`, `ZOH`) with
 //      zero idle buzz on silence.
 
-declare name "BRRDSP";
+declare name "BRR DSP";
 declare zd2_filename "XXBRRDSP";
 declare zd2_id "07001260";
 declare version "1.00";

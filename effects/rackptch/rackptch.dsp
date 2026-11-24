@@ -21,7 +21,7 @@
 //        cubic soft clipping and 12-bit signed PCM quantization -> reconstruction
 //        filter (`si.smooth(0.42)`), tapped for the soft-limited pitch feedback loop.
 
-declare name "RackPtch";
+declare name "Rack Pitch";
 declare zd2_filename "XXRCKPTC";
 declare zd2_id "07001110";
 declare version "1.00";

@@ -18,7 +18,7 @@
 //   4. Dry/Wet `Mix` (up to 100% wet vibrato/ensemble), `stock_vol` `Level`, and
 //      trailing `ON/OFF` (`LATCH | UNLATCH`) footswitch.
 
-declare name "XACHR";
+declare name "XA Chorus";
 declare zd2_filename "XXXACHR";
 declare zd2_id "07001200";
 declare version "1.00";

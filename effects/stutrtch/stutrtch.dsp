@@ -27,7 +27,7 @@
 //   4. Unity-Calibrated Gain Staging:
 //      - `Level` (`stock_vol`, `80` = unity) + `Mix` (`x + mix * (wet - x)`).
 
-declare name "StutRtch";
+declare name "Stut Rtch";
 declare zd2_filename "XXSTUTRT";
 declare zd2_id "070011d0";
 declare version "2.00";

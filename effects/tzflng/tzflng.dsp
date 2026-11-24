@@ -38,7 +38,7 @@
 //      Setting `Env` = 0 and `Drift` = 0 freezes the delay into a static
 //      tuned metallic comb filter.
 
-declare name "TZFlng";
+declare name "TZ Flanger";
 declare zd2_filename "XXTZFLNG";
 declare zd2_id "07001190";
 declare version "1.00";

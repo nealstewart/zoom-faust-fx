@@ -19,7 +19,7 @@
 //      ADPCM/bit-step `Grit` + `ma.tanh` self-oscillation ceiling.
 //   5. Equal-power Dry/Wet `Mix`, stock `Level`, and momentary `ON/OFF` footswitch.
 
-declare name "XADLY";
+declare name "XA Delay";
 declare zd2_filename "XXXADLY";
 declare zd2_id "070011f0";
 declare version "1.00";

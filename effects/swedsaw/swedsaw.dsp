@@ -18,7 +18,7 @@
 //   5. Dynamic diode-conductance ~6.0 kHz cab/fizz tamer (`dyn_fizz_lpf ~ _`)
 //      and unity-calibrated makeup gain.
 
-declare name "SwedSaw";
+declare name "Swed Saw";
 declare zd2_filename "XXSWDSAW";
 declare zd2_id "07001140";
 declare version "1.00";

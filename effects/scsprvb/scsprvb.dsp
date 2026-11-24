@@ -15,7 +15,7 @@
 //   4. 5 Saturn reverb presets (`ROOM`, `HALL`, `CATH`, `GLSS`, `CAVE`) +
 //      momentary footswitch throw (`ON/OFF = LATCH / UNLATCH`).
 
-declare name "SCSPRVB";
+declare name "SCSP Rvb";
 declare zd2_filename "XXSCSPRV";
 declare zd2_id "07001220";
 declare version "1.00";

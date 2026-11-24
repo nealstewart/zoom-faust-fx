@@ -14,7 +14,7 @@
 //      (`ef.velcro_clip`) with coupling-capacitor blocking distortion
 //      (`coupled_velcro ~ _`) and dynamic ~5.5 kHz fizz tamer.
 
-declare name "OctRing";
+declare name "Oct Ring";
 declare zd2_filename "XXOCTRG";
 declare zd2_id "07001150";
 declare version "1.00";

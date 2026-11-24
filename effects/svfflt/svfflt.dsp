@@ -11,7 +11,7 @@
 //   3. Resonant 2-pole Chamberlin State Variable Filter (`fi.svf_lp(freq, res)`)
 //   4. DC blocker (`fi.dcblocker`) + stock Zoom VOL output trim (`Level`)
 
-declare name "SVFFlt";
+declare name "SVF Filter";
 declare zd2_filename "XXSVFFLT";
 declare zd2_id "07001160";
 declare version "1.00";

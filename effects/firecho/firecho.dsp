@@ -20,7 +20,7 @@
 //   5. Selectable 16-bit fixed-point saturation vs. classic SNES S-DSP signed
 //      16-bit integer overflow wraparound (`SatWrap`).
 
-declare name "FIREcho";
+declare name "FIR Echo";
 declare zd2_filename "XXFIRECH";
 declare zd2_id "07001250";
 declare version "1.00";

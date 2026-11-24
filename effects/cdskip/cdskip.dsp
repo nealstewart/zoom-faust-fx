@@ -28,7 +28,7 @@
 //        default `100` completely bypassed/open).
 //      - `Level` (`stock_vol`, `80` = unity) + `Mix` (`x + mix * (wet - x)`).
 
-declare name "CDSkip";
+declare name "CD Skip";
 declare zd2_filename "XXCDSKIP";
 declare zd2_id "070011e0";
 declare version "1.00";

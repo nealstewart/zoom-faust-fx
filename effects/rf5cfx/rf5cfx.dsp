@@ -16,7 +16,7 @@
 //   4. 4 hardware revision output stages (`M1CD`, `M2CD`, `CDX`, `RAW8B`) with
 //      analog reconstruction filtering and pre-PCM overdrive.
 
-declare name "RF5CFX";
+declare name "RF5C FX";
 declare zd2_filename "XXRF5CFX";
 declare zd2_id "07001240";
 declare version "1.00";

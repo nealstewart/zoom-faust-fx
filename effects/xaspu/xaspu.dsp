@@ -5,7 +5,7 @@
 // package via:
 //   python tools/faust2zd2.py effects/ps1spu/ps1spu.dsp --build
 
-declare name "XASPU";
+declare name "XA SPU";
 declare zd2_filename "XXXASPU";
 declare zd2_id "070011a0";
 declare version "1.00";
