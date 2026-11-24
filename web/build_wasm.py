@@ -281,7 +281,14 @@ def compile_effect(zig_exe: Path, effect_dir: Path, tmp_dir: Path) -> Optional[d
     wasm_file = WASM_DIR / f"{slug}.wasm"
     c_file.write_text(patched_src, encoding="utf-8")
 
-    zig_inc = zig_exe.parent.parent / "lib" / "zig" / "include"
+    zig_real = zig_exe.resolve()
+    zig_inc_candidates = [
+        zig_real.parent / "lib" / "include",
+        zig_real.parent / "lib" / "zig" / "include",
+        zig_real.parent.parent / "lib" / "zig" / "include",
+        zig_exe.parent.parent / "lib" / "zig" / "include",
+    ]
+    zig_inc = next((p for p in zig_inc_candidates if p.is_dir()), None)
     cmd_cc = [
         str(zig_exe),
         "clang",
@@ -294,7 +301,7 @@ def compile_effect(zig_exe: Path, effect_dir: Path, tmp_dir: Path) -> Optional[d
         "-Wno-parentheses-equality",
         "-Wno-unused-variable",
     ]
-    if zig_inc.is_dir():
+    if zig_inc is not None:
         cmd_cc.extend(["-isystem", str(zig_inc)])
     cmd_cc.extend([str(c_file), "-o", str(obj_file)])
 
