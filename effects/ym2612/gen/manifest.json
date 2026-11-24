@@ -1,0 +1,78 @@
+{
+  "name": "YM2612",
+  "filename": "XXYM2612",
+  "id": "07001210",
+  "version": "1.00",
+  "display": "YM2612",
+  "badge": "YM",
+  "description": "16-bit FM-era YM2612 9-bit ladder DAC, Z80 PCM rate/jitter, and analog output stage emulator.",
+  "dspload": 20,
+  "kernel": "ym2612.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 88,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Model",
+      "values": [
+        "M1VA2",
+        "M1VA6",
+        "M2VA1",
+        "RAW9B"
+      ],
+      "default": 0,
+      "explanation": "Genesis hardware revision (M1VA2 = Model 1 VA2 warm, M1VA6 = Model 1 bright, M2VA1 = Model 2 muffled/clippy, RAW9B = unfiltered chip tap)."
+    },
+    {
+      "name": "Rate",
+      "max": 100,
+      "default": 52,
+      "explanation": "Z80 PCM / YM2612 sample-and-hold clock (0 = 4 kHz crusty speech PCM, 52 = 16 kHz Streets of Rage PCM, 100 = 44.1 kHz)."
+    },
+    {
+      "name": "Bits",
+      "max": 100,
+      "default": 55,
+      "explanation": "DAC bit-depth quantization (0 = clean 15-bit, 55 = YM2612 9-bit DAC, 67 = Z80 8-bit PCM, 100 = 4.5-bit crunch)."
+    },
+    {
+      "name": "Ladder",
+      "max": 100,
+      "default": 60,
+      "explanation": "YM2612 9-bit resistor-ladder zero-crossing discontinuity ('ladder effect' crossover buzz on quiet tails)."
+    },
+    {
+      "name": "DMAJit",
+      "max": 100,
+      "default": 35,
+      "explanation": "Z80 / 68000 DMA bus-contention sample clock jitter (59.92 Hz VBlank & scanline stutter)."
+    },
+    {
+      "name": "Drive",
+      "max": 100,
+      "default": 35,
+      "explanation": "Pre-DAC 9-bit digital rail & Genesis LM324/CXA1034P op-amp overdrive (auto-level compensated)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Master output level (80 is unity at nominal MS-70CDR+ bus level).",
+      "curve": "stock_vol"
+    },
+    {
+      "name": "ON/OFF",
+      "values": [
+        "LATCH",
+        "UNLATCH"
+      ],
+      "default": 0,
+      "footswitch_toggle": true,
+      "trailing": true,
+      "explanation": "LATCH: normal toggle. UNLATCH: momentary while held."
+    }
+  ],
+  "footswitch": {}
+}

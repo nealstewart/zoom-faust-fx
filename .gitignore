@@ -1,0 +1,23 @@
+# Build output and environments
+build/
+web/dist/
+__pycache__/
+.venv/
+.pixi/
+
+# Local toolchains, build caches, pedal dumps, firmware, audio samples, and logs
+.tools/
+.zig_cache_g/
+.zig_cache_l/
+backup/
+session/
+firmware-update/
+samples/
+*.log
+
+# Effect binaries never live in this repo, only sources.
+*.ZD2
+*.ZIC
+*.ZIR
+*.out
+*.code

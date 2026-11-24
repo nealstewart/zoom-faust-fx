@@ -1,0 +1,61 @@
+{
+  "name": "XASPU",
+  "filename": "XXXASPU",
+  "id": "070011a0",
+  "version": "1.00",
+  "display": "XA SPU",
+  "badge": "XA",
+  "description": "32-bit era 4-bit XA ADPCM codec and 4-point Gaussian DAC interpolator lo-fi processor.",
+  "dspload": 23,
+  "kernel": "xaspu.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 112,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Rate",
+      "max": 100,
+      "default": 50,
+      "explanation": "SPU voice sample clock (0 = 6 kHz dark loop, 50 = 19.6 kHz VAG, 100 = 44.1 kHz)."
+    },
+    {
+      "name": "ADPCM",
+      "max": 100,
+      "default": 55,
+      "explanation": "4-bit XA ADPCM intensity and predictor drive (0 = 16-bit PCM, 50 = 4-bit XA, 100 = slope-overload crunch)."
+    },
+    {
+      "name": "Pred",
+      "values": [
+        "FLAT",
+        "XA 1",
+        "XA 2",
+        "XA 3",
+        "XA 4"
+      ],
+      "default": 2,
+      "explanation": "Sony SPU ADPCM differential IIR predictor filter (FLAT, XA 1..4)."
+    },
+    {
+      "name": "Gauss",
+      "max": 100,
+      "default": 75,
+      "explanation": "DAC reconstruction (0 = ZOH steps, 35 = linear, 75 = PS1 4-point Gaussian, 100 = warm pillow)."
+    },
+    {
+      "name": "Width",
+      "max": 100,
+      "default": 40,
+      "explanation": "Stereo sample width (0 = mono 512KB RAM-saver voice, 100 = full stereo)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Master output level (80 is unity at nominal MS-70CDR+ bus level).",
+      "curve": "stock_vol"
+    }
+  ]
+}

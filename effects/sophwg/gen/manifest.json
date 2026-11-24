@@ -1,0 +1,54 @@
+{
+  "name": "SophWg",
+  "filename": "XXSOPHWG",
+  "id": "070011c0",
+  "version": "1.00",
+  "display": "SOPH WG",
+  "badge": "SW",
+  "description": "SOPHIE-style 4-point morphing Karplus-Strong + comb + triggered pitch-envelope vocal synthesizer (Rubber, Bubble, Squeaky Plastic, Inharmonic Metal).",
+  "dspload": 32,
+  "kernel": "sophwg.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 88,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Matrl",
+      "max": 100,
+      "default": 33,
+      "explanation": "4-point material morph (0 = Rubber, 33 = Bubble, 67 = Squeaky Plastic, 100 = Metal)."
+    },
+    {
+      "name": "Pitch",
+      "max": 48,
+      "default": 24,
+      "explanation": "Base Karplus-Strong pitch (-24..+24 semitones)."
+    },
+    {
+      "name": "P.Env",
+      "max": 200,
+      "default": 188,
+      "explanation": "Onset-triggered pitch envelope sweep depth (-100..+100%)."
+    },
+    {
+      "name": "Decay",
+      "max": 100,
+      "default": 55,
+      "explanation": "Karplus-Strong feedback decay scaling (0..100%)."
+    },
+    {
+      "name": "Bite",
+      "max": 100,
+      "default": 80,
+      "explanation": "Comb filter depth and transient bite (0..100%)."
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 95,
+      "explanation": "Dry vocal vs. wet blend (0..100%)."
+    }
+  ]
+}

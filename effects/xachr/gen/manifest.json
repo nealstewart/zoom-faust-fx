@@ -1,0 +1,78 @@
+{
+  "name": "XACHR",
+  "filename": "XXXACHR",
+  "id": "07001200",
+  "version": "1.00",
+  "display": "XA CHR",
+  "badge": "XA",
+  "description": "22.05 kHz 3-voice stereo modulation chorus with 16-bit saturation and warm low-pass rolloff.",
+  "dspload": 26,
+  "kernel": "xachr.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 64,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Mode",
+      "values": [
+        "DUAL",
+        "TRIO",
+        "NEGV",
+        "VBLNK"
+      ],
+      "default": 1,
+      "explanation": "PS1 chorus voicing (DUAL = 2-voice stereo, TRIO = 3-voice ensemble, NEGV = SPU negative-volume wide stereo, VBLNK = 60Hz stepped pitch LFO)."
+    },
+    {
+      "name": "Rate",
+      "max": 100,
+      "default": 24,
+      "explanation": "Modulation speed (0.10..5.50 Hz)."
+    },
+    {
+      "name": "Depth",
+      "max": 100,
+      "default": 55,
+      "explanation": "Chorus pitch/delay sweep depth (0..100%)."
+    },
+    {
+      "name": "Delay",
+      "max": 100,
+      "default": 35,
+      "explanation": "Base voice delay offset (4..24 ms; tight doubler to wide ensemble)."
+    },
+    {
+      "name": "Tone",
+      "max": 100,
+      "default": 45,
+      "explanation": "PS1 4-point Gaussian interpolation darkening (0 = bright, 100 = warm hazy 90s ROMpler)."
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 50,
+      "explanation": "Dry/Wet blend (0 = dry, 50 = classic chorus, 100 = 100% wet vibrato/ensemble)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Master output level (80 is unity).",
+      "curve": "stock_vol"
+    },
+    {
+      "name": "ON/OFF",
+      "values": [
+        "LATCH",
+        "UNLATCH"
+      ],
+      "default": 0,
+      "footswitch_toggle": true,
+      "trailing": true,
+      "explanation": "LATCH: normal toggle. UNLATCH: momentary while held."
+    }
+  ],
+  "footswitch": {}
+}

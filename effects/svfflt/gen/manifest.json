@@ -1,0 +1,43 @@
+{
+  "name": "SVFFlt",
+  "filename": "XXSVFFLT",
+  "id": "07001160",
+  "version": "1.00",
+  "display": "SVF FLT",
+  "badge": "SF",
+  "description": "Resonant 2-pole SVF synth filter + tanh saturator for Zoom MS Plus.",
+  "dspload": 8,
+  "kernel": "svfflt.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 64,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Drive",
+      "max": 100,
+      "default": 45,
+      "explanation": "Pre-filter tanh saturation drive (0..100)."
+    },
+    {
+      "name": "Freq",
+      "max": 100,
+      "default": 17,
+      "explanation": "Resonant 2-pole SVF low-pass cutoff (180..7500 Hz)."
+    },
+    {
+      "name": "Res",
+      "max": 93,
+      "default": 28,
+      "explanation": "Filter resonance Q factor (1..10)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Output level (80 is unity gain).",
+      "curve": "stock_vol"
+    }
+  ]
+}

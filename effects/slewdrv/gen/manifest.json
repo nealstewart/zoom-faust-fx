@@ -1,0 +1,49 @@
+{
+  "name": "SlewDrv",
+  "filename": "XXSLEWDR",
+  "id": "07001120",
+  "version": "1.00",
+  "display": "SLEW DRV",
+  "badge": "SL",
+  "description": "4x oversampled op-amp slew-rate limiter, hard diode clipper, thermal sag, and tone filter.",
+  "dspload": 21,
+  "kernel": "slewdrv.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 96,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Dist",
+      "max": 100,
+      "default": 60,
+      "explanation": "LM308 gain + silicon diode distortion amount (0..100)."
+    },
+    {
+      "name": "Fltr",
+      "max": 100,
+      "default": 35,
+      "explanation": "Classic RAT backwards Filter tone control (0 = bright, 100 = dark)."
+    },
+    {
+      "name": "Tight",
+      "max": 100,
+      "default": 45,
+      "explanation": "Pre-clip bass cut / Ruetz mod (0 = fat 60 Hz, 100 = tight 320 Hz)."
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 85,
+      "explanation": "Parallel dry/wet blend (100 = full distortion, 60-85 great on vocals)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Output level (80 is unity at nominal MS-70CDR+ bus level).",
+      "curve": "stock_vol"
+    }
+  ]
+}

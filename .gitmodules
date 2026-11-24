@@ -1,0 +1,4 @@
+[submodule "vendor/stomphacks"]
+	path = vendor/stomphacks
+	url = https://github.com/nealstewart/stomphacks
+	branch = minimal-fixes

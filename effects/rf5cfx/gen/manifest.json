@@ -1,0 +1,66 @@
+{
+  "name": "RF5CFX",
+  "filename": "XXRF5CFX",
+  "id": "07001240",
+  "version": "1.00",
+  "display": "RF5C FX",
+  "badge": "RF",
+  "description": "Ricoh RF5C164 8-bit sign-magnitude PCM lo-fi processor with 4-32.55 kHz clock, random S&H clock jitter, and 4 output stages.",
+  "dspload": 14,
+  "kernel": "rf5cfx.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 80,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Model",
+      "values": [
+        "MOD1",
+        "MOD2",
+        "PORT",
+        "RAW8B"
+      ],
+      "default": 0,
+      "explanation": "Sega CD hardware output stage (Model 1 stage, Model 2 dark stage, Portable crisp stage, Raw 8-bit RF5C164 tap)."
+    },
+    {
+      "name": "Rate",
+      "max": 29,
+      "default": 18,
+      "explanation": "Ricoh RF5C164 PCM clock rate (4..33 kHz; 33 = max 32.55 kHz)."
+    },
+    {
+      "name": "Bits",
+      "max": 100,
+      "default": 55,
+      "explanation": "8-bit sign-magnitude PCM grit (0 = clean 16-bit CD-DA, 55 = authentic 8-bit RF5C164, 100 = crunchy 4.5-bit)."
+    },
+    {
+      "name": "ClkJit",
+      "max": 100,
+      "default": 20,
+      "explanation": "Random S&H RF5C164 clock jitter & drift (0 = crystal-locked, 100 = unstable clock)."
+    },
+    {
+      "name": "Tone",
+      "max": 100,
+      "default": 65,
+      "explanation": "Analog reconstruction low-pass filter trim (0 = dark, 100 = bright)."
+    },
+    {
+      "name": "Drive",
+      "max": 100,
+      "default": 15,
+      "explanation": "Pre-PCM input overdrive (0..100)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Master output level (80 is unity gain).",
+      "curve": "stock_vol"
+    }
+  ]
+}

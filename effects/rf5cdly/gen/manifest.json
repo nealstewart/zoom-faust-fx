@@ -1,0 +1,83 @@
+{
+  "name": "RF5CDly",
+  "filename": "XXRF5CDL",
+  "id": "07001230",
+  "version": "1.00",
+  "display": "RF5C DLY",
+  "badge": "RF",
+  "description": "Ricoh RF5C164 8-bit sign-magnitude PCM stereo ping-pong delay (up to 740 ms) with 4-32.55 kHz clock and random S&H clock jitter.",
+  "dspload": 20,
+  "kernel": "rf5cdly.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 136,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Mode",
+      "values": [
+        "PING",
+        "DUAL",
+        "MONO",
+        "WIDE"
+      ],
+      "default": 0,
+      "explanation": "RF5C164 stereo echo routing (Ping-Pong, Dual 1:0.75, Mono, Wide Inverted)."
+    },
+    {
+      "name": "Time",
+      "max": 100,
+      "default": 42,
+      "explanation": "Delay time (20..740 ms)."
+    },
+    {
+      "name": "Fdbk",
+      "max": 95,
+      "default": 52,
+      "explanation": "Echo feedback repeats (0..95)."
+    },
+    {
+      "name": "Rate",
+      "max": 29,
+      "default": 18,
+      "explanation": "Ricoh RF5C164 PCM clock rate (4..33 kHz; 33 = max 32.55 kHz)."
+    },
+    {
+      "name": "Bits",
+      "max": 100,
+      "default": 55,
+      "explanation": "8-bit sign-magnitude PCM grit (0 = clean 16-bit CD-DA, 55 = authentic 8-bit RF5C164, 100 = crunchy 5-bit)."
+    },
+    {
+      "name": "ClkJit",
+      "max": 100,
+      "default": 20,
+      "explanation": "Random S&H RF5C164 clock jitter & delay-tap drift (0 = crystal-locked, 100 = unstable clock)."
+    },
+    {
+      "name": "Tone",
+      "max": 100,
+      "default": 62,
+      "explanation": "Sega CD analog output low-pass filter (0 = dark, 100 = bright)."
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 42,
+      "explanation": "Dry/Wet delay mix (0..100)."
+    },
+    {
+      "name": "ON/OFF",
+      "values": [
+        "LATCH",
+        "UNLATCH"
+      ],
+      "default": 0,
+      "footswitch_toggle": true,
+      "trailing": true,
+      "explanation": "LATCH: normal toggle. UNLATCH: momentary while held."
+    }
+  ],
+  "footswitch": {}
+}

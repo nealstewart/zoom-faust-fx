@@ -1,0 +1,71 @@
+{
+  "name": "BRRDSP",
+  "filename": "XXBRRDSP",
+  "id": "07001260",
+  "version": "1.00",
+  "display": "BRR DSP",
+  "badge": "BR",
+  "description": "16-bit era 4-bit BRR ADPCM codec (F0-F3 predictors), 4-point Gaussian interpolator, 4-32 kHz voice clock, and 4 output models.",
+  "dspload": 20,
+  "kernel": "brrdsp.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 112,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Model",
+      "values": [
+        "WARM",
+        "CLEAN",
+        "RAW",
+        "ZOH"
+      ],
+      "default": 0,
+      "explanation": "SNES hardware stage (WARM = vintage warm stage, CLEAN = crisp revision, RAW = direct S-DSP digital, ZOH = bypass Gaussian)."
+    },
+    {
+      "name": "Filter",
+      "values": [
+        "F0",
+        "F1",
+        "F2",
+        "F3"
+      ],
+      "default": 2,
+      "explanation": "SNES 4-bit BRR ADPCM predictor filter (F0=Direct, F1=15/16, F2=61/32-15/16, F3=115/64-13/16)."
+    },
+    {
+      "name": "Rate",
+      "max": 28,
+      "default": 14,
+      "explanation": "BRR voice sample rate into the 32 kHz S-DSP Gaussian interpolator (4..32 kHz)."
+    },
+    {
+      "name": "Gauss",
+      "max": 100,
+      "default": 75,
+      "explanation": "SNES 4-point Gaussian interpolator warmth / blanket rolloff (0 = crisp linear/ZOH, 75 = authentic SNES, 100 = extra cloudy)."
+    },
+    {
+      "name": "BrrGrit",
+      "max": 100,
+      "default": 55,
+      "explanation": "4-bit BRR ADPCM compression & adaptive nibble quantization grit (0 = clean 16-bit, 55 = authentic BRR, 100 = crushed)."
+    },
+    {
+      "name": "Drive",
+      "max": 100,
+      "default": 15,
+      "explanation": "Pre-BRR input overdrive with S-DSP 16-bit saturation (0..100)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Master output level (80 is unity gain).",
+      "curve": "stock_vol"
+    }
+  ]
+}

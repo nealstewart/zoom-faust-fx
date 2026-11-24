@@ -1,0 +1,55 @@
+{
+  "name": "OctRing",
+  "filename": "XXOCTRG",
+  "id": "07001150",
+  "version": "1.00",
+  "display": "OCT RING",
+  "badge": "SH",
+  "description": "Clean-room FAUST Hellektro Octave/Ring-Mod Fuzz: full-wave rectifier octave gnarl, internal carrier ring modulator, and 4x oversampled gated velcro fuzz.",
+  "dspload": 26,
+  "kernel": "octring.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 120,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Fuzz",
+      "max": 100,
+      "default": 60,
+      "explanation": "Gated velcro fuzz drive (0..100)."
+    },
+    {
+      "name": "Oct",
+      "max": 100,
+      "default": 55,
+      "explanation": "Octavia/Superfuzz full-wave rectifier upper-octave gnarl (0..100)."
+    },
+    {
+      "name": "Ring",
+      "max": 100,
+      "default": 35,
+      "explanation": "Internal sine-carrier Ring Modulator depth (0 = pure octave fuzz, 100 = full robotic ring)."
+    },
+    {
+      "name": "Freq",
+      "max": 100,
+      "default": 35,
+      "explanation": "Ring Mod carrier frequency (40 Hz demonic growl -> 1200 Hz metallic shriek)."
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 80,
+      "explanation": "Parallel dry/wet blend (60-85 keeps vocals intelligible while ripping)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Output level (80 is unity at nominal MS-70CDR+ bus level).",
+      "curve": "stock_vol"
+    }
+  ]
+}

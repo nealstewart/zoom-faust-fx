@@ -1,0 +1,34 @@
+[workspace]
+name = "zoom-faust-fx"
+channels = ["conda-forge"]
+platforms = ["win-64"]
+
+[dependencies]
+python = ">=3.11,<3.13"
+construct = "*"
+crcmod = "*"
+pyelftools = "*"
+pillow = "*"
+zig = ">=0.17.1,<0.18"
+
+[pypi-dependencies]
+mido = "*"
+python-rtmidi = "*"
+
+[activation.env]
+ZOOM_TI_CGT = "C:\\Users\\neala\\.gemini\\antigravity\\scratch\\stomphacks\\.tools\\ti-cgt-c6000_8.5.0.LTS"
+
+[tasks]
+test = "python -m unittest discover -s tests -v"
+midi-ports = "python vendor/stomphacks/tools-pedal/midi_ports.py"
+selftest = "python vendor/stomphacks/tools-pedal/install_selftest.py"
+safe-connect = "python vendor/stomphacks/tools-pedal/safe_connect.py session/"
+backup = "python vendor/stomphacks/tools-pedal/backup_pedal.py backup/"
+build-rackptch = "python tools/faust2zd2.py effects/rackptch/rackptch.dsp --build"
+build-svfflt = "python tools/faust2zd2.py effects/svfflt/svfflt.dsp --build"
+build-anlgdrv = "python tools/faust2zd2.py effects/anlgdrv/anlgdrv.dsp --build"
+build-xaspu = "python tools/build_effect.py effects/xaspu/gen/manifest.json"
+build-xarvb = "python tools/build_effect.py effects/xarvb/gen/manifest.json"
+build-ym2612 = "python tools/faust2zd2.py effects/ym2612/ym2612.dsp --build"
+web-build = "python web/build_wasm.py"
+web = "python web/serve.py"

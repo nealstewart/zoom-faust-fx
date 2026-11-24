@@ -1,0 +1,57 @@
+{
+  "name": "TZFlng",
+  "filename": "XXTZFLNG",
+  "id": "07001190",
+  "version": "1.00",
+  "display": "TZ FLNG",
+  "badge": "TZ",
+  "description": "Through-zero stereo vocal & tape flanger with external SDRAM delay lines and all-pass feedback dispersion.",
+  "dspload": 29,
+  "kernel": "tzflng.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 72,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "ManMs",
+      "max": 75,
+      "default": 20,
+      "explanation": "Base delay / static comb tuning (0.5..8.0 ms; 2.5 ms is through-zero center)."
+    },
+    {
+      "name": "Env",
+      "max": 200,
+      "default": 135,
+      "explanation": "Vocal envelope modulation depth and direction (-100..+100%)."
+    },
+    {
+      "name": "Drift",
+      "max": 100,
+      "default": 30,
+      "explanation": "Non-periodic micro-drift modulation depth (0..100%; 0 for frozen static comb)."
+    },
+    {
+      "name": "Fdbk",
+      "max": 130,
+      "default": 20,
+      "explanation": "Bipolar all-pass dispersed feedback (-65..+65%; neg = hollow industrial, pos = metallic bite)."
+    },
+    {
+      "name": "Depth",
+      "max": 200,
+      "default": 25,
+      "explanation": "Bipolar wet blend (-100..+100%; neg = through-zero phase cancel, pos = additive flange)."
+    },
+    {
+      "name": "Wide",
+      "values": [
+        "MONO",
+        "WIDE"
+      ],
+      "default": 1,
+      "explanation": "Stereo mode (MONO = dual T_mod, WIDE = Eventide T_mod Left / inverted 0.5*T_mod Right)."
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "name": "StutRtch",
+  "filename": "XXSTUTRT",
+  "id": "070011d0",
+  "version": "2.00",
+  "display": "STUT RTCH",
+  "badge": "SR",
+  "description": "FAUST 3s SDRAM stutter & random ratchet looper (UNLATCH=retro grab, LATCH=auto transient) with random SRR/BRR, driven analog LPF, and clean HPF.",
+  "dspload": 27,
+  "kernel": "stutrtch.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 96,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Slice",
+      "max": 100,
+      "default": 45,
+      "explanation": "Base stutter slice length on an exponential curve (25 ms to 2,000 ms)."
+    },
+    {
+      "name": "Ratch",
+      "max": 100,
+      "default": 35,
+      "explanation": "Random ratchet subdivision depth (0 = steady 1x loop, 100 = wide random 1/2x..8x jumps & scatter)."
+    },
+    {
+      "name": "RndMd",
+      "values": [
+        "STOMP",
+        "SLICE",
+        "BOTH"
+      ],
+      "default": 2,
+      "explanation": "When random sources re-roll Ratchet, SRR, and BRR: on STOMP, every SLICE wrap, or BOTH."
+    },
+    {
+      "name": "SRR",
+      "max": 100,
+      "default": 40,
+      "explanation": "Random Sample Rate Reduction ceiling (0 = off / 44.1 kHz, 100 = random ZOH down to ~1.5 kHz)."
+    },
+    {
+      "name": "BRR",
+      "max": 100,
+      "default": 35,
+      "explanation": "Random Bit Rate Reduction ceiling (0 = off, 100 = random bitcrushing down to ~2.5-bit)."
+    },
+    {
+      "name": "LPF",
+      "max": 100,
+      "default": 100,
+      "explanation": "Driven emulated analog 2-pole resonant LPF cutoff (350 Hz warm dub to 16 kHz open)."
+    },
+    {
+      "name": "HPF",
+      "max": 100,
+      "default": 0,
+      "explanation": "Clean undriven 2-pole Butterworth HPF cutoff after LPF (0 = off, 1..100 = 40 Hz to 3.5 kHz)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Stutter wet output level (80 is unity at nominal MS-70CDR+ bus level).",
+      "curve": "stock_vol"
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 100,
+      "explanation": "Dry vs. stutter wet crossfade when active (0..100%)."
+    },
+    {
+      "name": "ON/OFF",
+      "values": [
+        "LATCH",
+        "UNLATCH"
+      ],
+      "default": 1,
+      "footswitch_toggle": true,
+      "trailing": true,
+      "explanation": "LATCH: normal toggle. UNLATCH: momentary while held."
+    }
+  ],
+  "footswitch": {}
+}

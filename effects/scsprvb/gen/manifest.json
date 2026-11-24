@@ -1,0 +1,79 @@
+{
+  "name": "SCSPRVB",
+  "filename": "XXSCSPRV",
+  "id": "07001220",
+  "version": "1.00",
+  "display": "SCSP RVB",
+  "badge": "SC",
+  "description": "YMF292 SCSP 44.1 kHz programmable DSP reverb with PACK/UNPACK floating-point delay RAM compression, Hadamard FDN tank, and 5 presets.",
+  "dspload": 30,
+  "kernel": "scsprvb.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 80,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Mode",
+      "values": [
+        "ROOM",
+        "HALL",
+        "CATH",
+        "GLSS",
+        "CAVE"
+      ],
+      "default": 1,
+      "explanation": "Sega Saturn SCSP reverb space (Room, Hall, Cathedral, Glass, Cave)."
+    },
+    {
+      "name": "Decay",
+      "max": 100,
+      "default": 68,
+      "explanation": "SCSP FDN reverb decay time (0..100)."
+    },
+    {
+      "name": "PreD",
+      "max": 85,
+      "default": 18,
+      "explanation": "Pre-delay before the SCSP reverb tank (0..85 ms)."
+    },
+    {
+      "name": "Damp",
+      "max": 100,
+      "default": 42,
+      "explanation": "High-frequency absorption inside the SCSP feedback matrix (0 = bright, 100 = dark)."
+    },
+    {
+      "name": "Pack",
+      "max": 100,
+      "default": 50,
+      "explanation": "SCSP PACK/UNPACK floating-point delay RAM quantization grit (0 = clean 24-bit, 50 = authentic 11-bit mantissa, 100 = crushed 6-bit)."
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 45,
+      "explanation": "Dry/Wet blend (0 = dry, 50 = balanced, 100 = 100% wet SCSP tank)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Master output level (80 is unity gain).",
+      "curve": "stock_vol"
+    },
+    {
+      "name": "ON/OFF",
+      "values": [
+        "LATCH",
+        "UNLATCH"
+      ],
+      "default": 0,
+      "footswitch_toggle": true,
+      "trailing": true,
+      "explanation": "LATCH: normal toggle. UNLATCH: momentary while held."
+    }
+  ],
+  "footswitch": {}
+}

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stomphacks — ZD2 WebAssembly Auditioner</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Header & Transport -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-logo">SH</div>
+        <div>
+          <h1>STOMPHACKS <span class="badge-wasm">WASM DSP</span></h1>
+          <div class="subtitle">Zoom MS Plus ZD2 Browser Auditioner · 44.1 kHz / 16-sample blocks</div>
+        </div>
+      </div>
+
+      <!-- Oscilloscope / Spectrum -->
+      <div class="scope-box" title="Click to switch Oscilloscope / Spectrum">
+        <canvas id="scopeCanvas" width="240" height="48"></canvas>
+        <span id="scopeModeLabel" class="scope-label">SCOPE</span>
+      </div>
+
+      <!-- Master Controls & VU Meters -->
+      <div class="master-bar">
+        <div class="meter-group" title="Input Peak L/R">
+          <span class="meter-tag">IN</span>
+          <div class="meter-bars">
+            <div class="meter-track"><div id="meterInL" class="meter-fill"></div></div>
+            <div class="meter-track"><div id="meterInR" class="meter-fill"></div></div>
+          </div>
+        </div>
+
+        <label class="mini-slider" title="Input Gain">
+          <span>IN</span>
+          <input id="inGainSlider" type="range" min="0" max="200" value="100" />
+          <span id="inGainVal" class="mono">100%</span>
+        </label>
+
+        <label class="mini-slider" title="Master Wet/Dry Mix">
+          <span>WET</span>
+          <input id="masterMixSlider" type="range" min="0" max="100" value="100" />
+          <span id="masterMixVal" class="mono">100%</span>
+        </label>
+
+        <label class="mini-slider" title="Master Output Level">
+          <span>OUT</span>
+          <input id="outGainSlider" type="range" min="0" max="150" value="90" />
+          <span id="outGainVal" class="mono">90%</span>
+        </label>
+
+        <div class="meter-group" title="Output Peak L/R">
+          <span class="meter-tag">OUT</span>
+          <div class="meter-bars">
+            <div class="meter-track"><div id="meterOutL" class="meter-fill"></div></div>
+            <div class="meter-track"><div id="meterOutR" class="meter-fill"></div></div>
+          </div>
+        </div>
+
+        <button id="globalBypassBtn" class="btn btn-bypass" title="Global Bypass (Space)">
+          <span class="led"></span> ACTIVE
+        </button>
+        <button id="panicBtn" class="btn btn-ghost" title="Clear all delay/reverb buffers">PANIC</button>
+      </div>
+    </header>
+
+    <!-- Audio Source Bar -->
+    <section class="source-bar">
+      <div class="source-tabs" role="tablist">
+        <button class="tab-btn active" data-source="sample">Dry Samples / File</button>
+        <button class="tab-btn" data-source="synth">Test Synth</button>
+        <button class="tab-btn" data-source="mic">Live Mic / Guitar</button>
+      </div>
+
+      <!-- Sample / File Player -->
+      <div id="panel-sample" class="source-panel active">
+        <select id="sampleSelect" class="select-input"></select>
+        <button id="playSampleBtn" class="btn btn-primary">▶ Play</button>
+        <button id="loopSampleBtn" class="btn btn-toggle active" title="Loop playback">↻ Loop</button>
+        <div class="scrub-wrap">
+          <input id="scrubSlider" type="range" min="0" max="1000" value="0" />
+          <span id="timeDisplay" class="mono time-label">0:00 / 0:00</span>
+        </div>
+        <label class="btn btn-ghost file-upload-btn" title="Load a local WAV/MP3/OGG/FLAC file">
+          + Load Audio
+          <input id="fileInput" type="file" accept="audio/*" hidden />
+        </label>
+      </div>
+
+      <!-- Test Synth (TB-303 Acid Sequencer & Keyboard) -->
+      <div id="panel-synth" class="source-panel">
+        <select id="synthVoiceSelect" class="select-input">
+          <option value="acid_saw">TB-303 Acid Saw</option>
+          <option value="acid_sqr">TB-303 Acid Square</option>
+          <option value="pluck">Pluck</option>
+          <option value="pad">Warm Pad</option>
+        </select>
+        <select id="acidPatternSelect" class="select-input" title="16-step 303 acid pattern (synced to toolbar BPM)">
+          <option value="acid1">Acid 1 (Classic)</option>
+          <option value="acid2">Acid 2 (Phuture)</option>
+          <option value="ebm">EBM Octave</option>
+          <option value="minimal">Dark Minimal</option>
+        </select>
+        <button id="autoRiffBtn" class="btn btn-primary">▶ 303 Loop</button>
+        <button id="acidRandBtn" class="btn btn-ghost btn-sm" title="Generate a new random 16-step acid bassline">🎲</button>
+        <label class="mini-slider" title="303 Filter Cutoff">
+          <span>CUT</span>
+          <input id="acidCutoffSlider" type="range" min="0" max="100" value="38" />
+        </label>
+        <label class="mini-slider" title="303 Filter Resonance (Squelch)">
+          <span>RES</span>
+          <input id="acidResSlider" type="range" min="0" max="100" value="72" />
+        </label>
+        <div id="miniKeyboard" class="mini-keyboard" title="Click keys or use computer keys A-K"></div>
+      </div>
+
+      <!-- Live Mic / Interface -->
+      <div id="panel-mic" class="source-panel">
+        <button id="micEnableBtn" class="btn btn-primary">🎙 Enable Live Input</button>
+        <select id="micDeviceSelect" class="select-input" disabled>
+          <option value="">Default Audio Input</option>
+        </select>
+        <span id="micStatus" class="status-pill">Idle (use headphones to avoid feedback)</span>
+      </div>
+
+      <div class="audio-status">
+        <span id="audioCtxState" class="status-pill">Audio: Click Play or a Key to Start</span>
+      </div>
+    </section>
+
+    <!-- Main Workspace -->
+    <div class="workspace">
+      <!-- Left Sidebar: Effect Catalog -->
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <h2>ZD2 Effects (<span id="effectCount">0</span>)</h2>
+          <input id="searchInput" type="search" class="search-input" placeholder="Search effects..." />
+          <div id="categoryPills" class="category-pills"></div>
+        </div>
+        <div id="effectList" class="effect-list"></div>
+      </aside>
+
+      <!-- Main Stage: Pedalboard Chain -->
+      <main class="stage">
+        <div class="stage-toolbar">
+          <div class="chain-info">
+            <span class="chain-label">SIGNAL CHAIN</span>
+            <span id="chainSummary" class="mono muted">IN → (empty) → OUT</span>
+          </div>
+          <div class="preset-group">
+            <div class="bpm-box" title="Global Tempo for beat-synced effects (e.g. PS1DLY)">
+              <span class="muted">BPM</span>
+              <input id="bpmInput" type="number" class="bpm-input mono" min="60" max="200" value="120" />
+              <button id="tapTempoBtn" class="btn btn-ghost btn-sm" title="Tap repeatedly to set BPM">TAP</button>
+            </div>
+            <span class="muted">Presets:</span>
+            <select id="presetSelect" class="select-input select-sm">
+              <option value="">Load preset chain…</option>
+              <option value="xa_lofi">32-Bit XA Lo-Fi Space (XASPU → XARVB)</option>
+              <option value="xa_dub">32-Bit XA BBD Dub (XASPU → XADLY → XARVB)</option>
+              <option value="xa_dream">32-Bit XA Dream Pad (XACHR → XADLY → XARVB)</option>
+              <option value="fm_32bit">FM / PCM / SCSP (YM2612 → RF5CDly → SCSPRVB)</option>
+              <option value="brr_16bit">16-Bit BRR Echo (BRRDSP → FIREcho)</option>
+              <option value="ebm_dirt">Industrial EBM (DeskDrv → SlewDrv → TZFlng)</option>
+              <option value="glitch_pitch">Glitch Pitch (CDSkip → RackPtch → SophWg)</option>
+              <option value="parallel_split">Parallel Split/Merge (WfSplit → SwedSaw → WfSwap → XARVB → WfMerge)</option>
+            </select>
+            <button id="clearChainBtn" class="btn btn-ghost btn-sm">Clear Chain</button>
+          </div>
+        </div>
+
+        <div id="pedalboard" class="pedalboard">
+          <!-- Stompbox cards rendered here -->
+        </div>
+
+        <div id="dropOverlay" class="drop-overlay hidden">
+          <div class="drop-box">Drop audio file (WAV / MP3 / OGG / FLAC) to audition</div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

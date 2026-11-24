@@ -1,0 +1,55 @@
+{
+  "name": "DeskDrv",
+  "filename": "XXDESKDR",
+  "id": "07001130",
+  "version": "1.00",
+  "display": "DESK DRV",
+  "badge": "DK",
+  "description": "Overdriven compact analog console channel strip preamp with soft clipping and 3-band EQ.",
+  "dspload": 30,
+  "kernel": "deskdrv.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 120,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Gain",
+      "max": 100,
+      "default": 55,
+      "explanation": "Console mic-preamp Trim overload (0 = warm glue, 100 = crushed gabber/EBM)."
+    },
+    {
+      "name": "Low",
+      "max": 100,
+      "default": 50,
+      "explanation": "100 Hz channel-strip Low shelf (50 = flat, 0 = cut, 100 = +10 dB boost)."
+    },
+    {
+      "name": "Mid",
+      "max": 100,
+      "default": 60,
+      "explanation": "2.5 kHz channel-strip Mid bell (50 = flat, 0 = scoop, 100 = vocal bite)."
+    },
+    {
+      "name": "High",
+      "max": 100,
+      "default": 45,
+      "explanation": "6.5 kHz channel-strip High shelf (50 = flat, 0 = dark, 100 = crisp air)."
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 100,
+      "explanation": "Parallel dry/wet blend (100 = full console strip)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Channel fader output level (80 is unity at nominal MS-70CDR+ bus level).",
+      "curve": "stock_vol"
+    }
+  ]
+}

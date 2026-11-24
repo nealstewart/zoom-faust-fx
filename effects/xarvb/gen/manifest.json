@@ -1,0 +1,79 @@
+{
+  "name": "XARVB",
+  "filename": "XXXARVB",
+  "id": "070011b0",
+  "version": "1.00",
+  "display": "XA RVB",
+  "badge": "XA",
+  "description": "22.05 kHz half-rate 16-bit hardware reverb with 5 space presets (Room, Studio, Hall, Space, Pipe) and momentary footswitch.",
+  "dspload": 32,
+  "kernel": "xarvb.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 96,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Mode",
+      "values": [
+        "ROOM",
+        "STDO",
+        "HALL",
+        "SPCE",
+        "PIPE"
+      ],
+      "default": 3,
+      "explanation": "Sony PS1 SPU BIOS reverb algorithm (Room, Studio, Hall, Space Echo, Pipe)."
+    },
+    {
+      "name": "Decay",
+      "max": 100,
+      "default": 68,
+      "explanation": "SPU vWALL reflection feedback / reverb tail duration (0..100)."
+    },
+    {
+      "name": "PreD",
+      "max": 90,
+      "default": 15,
+      "explanation": "Pre-delay before the SPU reverb tank (0..90 ms)."
+    },
+    {
+      "name": "Damp",
+      "max": 100,
+      "default": 55,
+      "explanation": "SPU vIIR 22.05 kHz internal tank high-frequency damping (0 = bright metallic, 100 = dark)."
+    },
+    {
+      "name": "Early",
+      "max": 100,
+      "default": 60,
+      "explanation": "SPU dAPF1/dAPF2 all-pass diffusion and fluttery early reflections (0..100)."
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 45,
+      "explanation": "Dry/Wet blend (0 = dry, 50 = unity dry + wet, 100 = 100% wet SPU tank)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Master output level (80 is unity at nominal MS-70CDR+ bus level).",
+      "curve": "stock_vol"
+    },
+    {
+      "name": "ON/OFF",
+      "values": [
+        "LATCH",
+        "UNLATCH"
+      ],
+      "default": 0,
+      "footswitch_toggle": true,
+      "trailing": true,
+      "explanation": "LATCH: normal toggle. UNLATCH: momentary while held."
+    }
+  ],
+  "footswitch": {}
+}

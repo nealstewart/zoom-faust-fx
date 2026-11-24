@@ -1,0 +1,49 @@
+{
+  "name": "SwedSaw",
+  "filename": "XXSWDSAW",
+  "id": "07001140",
+  "version": "1.00",
+  "display": "SWED SAW",
+  "badge": "SW",
+  "description": "High-gain Swedish chainsaw distortion with dual-band resonant mid/high gyrator EQ.",
+  "dspload": 27,
+  "kernel": "swedsaw.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 136,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Dist",
+      "max": 100,
+      "default": 75,
+      "explanation": "Cascaded dual-stage chainsaw clipping gain (0..100; dime it for Swedish buzz!)."
+    },
+    {
+      "name": "Col L",
+      "max": 100,
+      "default": 75,
+      "explanation": "HM-2 ~90 Hz active gyrator low punch (50 = neutral, 100 = dimed wall)."
+    },
+    {
+      "name": "Col H",
+      "max": 100,
+      "default": 85,
+      "explanation": "HM-2 ~1.15 kHz + ~3.0 kHz active gyrator chainsaw snarl (50 = neutral, 100 = full buzz)."
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 85,
+      "explanation": "Parallel dry/wet blend (100 = pure chainsaw, 65-85 keeps vocals razor-clear)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Output level (80 is unity at nominal MS-70CDR+ bus level).",
+      "curve": "stock_vol"
+    }
+  ]
+}

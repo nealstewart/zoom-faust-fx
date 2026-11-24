@@ -1,0 +1,89 @@
+// effects/zoom.lib
+//
+// Shared Standard-FAUST DSP Helper Library for Zoom MS Plus Pedals (44.1 kHz).
+// Import inside any effect `.dsp` file using standard Faust syntax:
+//   import("stdfaust.lib");
+//   import("zoom.lib");
+//
+// All definitions in this file are composed strictly of standard Faust
+// operators and official `stdfaust.lib` primitives (`fi.*`, `si.*`, `de.*`,
+// `ba.*`, `ma.*`, `aa.*`, `no.*`) so they work identically with both the
+// official `faust` compiler (`faust -I effects/`) and `tools/faust2zd2.py`.
+
+// ---- 1. Fast 1-Pole Filters & Smoothers (`fi.*` / `si.*`) ----
+
+// 1-pole EMA smoother with direct alpha coefficient `a` in (0, 1):
+//   y[n] = y[n-1] + a * (x[n] - y[n-1]) = (1 - a) * y[n-1] + a * x[n]
+// Expressed in standard Faust via `si.smooth(1.0 - a)`.
+zm_ema(a, x) = si.smooth(1.0 - a, x);
+
+// 1st-order all-pass phase disperser:
+//   H(z) = (g + z^-1) / (1 + g * z^-1)
+// Expressed in standard Faust via `fi.tf1(g, 1.0, g, x)`.
+zm_allpass1(g, x) = fi.tf1(g, 1.0, g, x);
+
+// ---- 2. Saturators & Quantizers (Calibrated for Zoom -18 dBFS / 0.25 RMS Bus) ----
+
+// C^1-continuous cubic soft clipper on [-1.5, +1.5] -> [-1.0, +1.0]:
+//   f(x) = x - (4/27) * x^3  (zero slope at +-1.5, unity slope at 0)
+zm_soft_clip(x) = xc - 0.14814815 * xc * xc * xc
+    with {
+        xc = aa.clip(-1.5, 1.5, x);
+    };
+
+// 12-bit signed PCM rack DAC quantizer (-2048..+2048 steps, Boss SE-50 style;
+// uses fast SPTRUNC+INTSP truncation, matching zm_sat16, with dither pre-applied)
+zm_quant12(s) = int(s * 2048.0) * 0.00048828125;
+
+// 16-bit signed fixed-point accumulator saturator (Sony PS1 SPU style)
+zm_sat16(x) = int(zm_soft_clip(x) * 16384.0) * 0.00006103515625;
+
+// ---- 3. Grain Windowing & Phase Accumulators ----
+
+// 20% smoothstep Tukey grain crossfade window on normalized phase `p` in [0, 1):
+//   - p in [0.00, 0.20): cubic Hermite fade-in  3t^2 - 2t^3  (t = 5*p)
+//   - p in [0.20, 0.50): 1.0 (Tap A solo)
+//   - p in [0.50, 0.70): cubic Hermite fade-out 1 - (3t^2 - 2t^3)
+//   - p in [0.70, 1.00): 0.0 (Tap B solo)
+// Expressed branchlessly via symmetry around p = 0.35 so cl6x can software-pipeline
+// grain loops without conditional branches.
+zm_tukey20(p) = u * u * (3.0 - 2.0 * u)
+    with {
+        u = aa.clip(0.0, 1.0, (0.35 - abs(p - 0.35)) * 5.0);
+    };
+
+// ---- 4. Zoom MS Plus SDRAM Delay Line Helpers (4096-Sample Ring Buffer) ----
+//
+// Standard-Faust wrappers around `de.delay`, `de.fdelay1`, `de.fdelay2`, and
+// `de.fdelay3` pre-sized to the hardware-verified 4096-float (~92.9 ms @ 44.1 kHz)
+// power-of-two SDRAM ring buffer (`instance[3]`).
+//
+// Multiple calls to `zm_delay` / `zm_fdelay*` on the same signal `x` automatically
+// share a single underlying 4096-float SDRAM ring buffer (`dline_k`) per channel
+// with a `+16`-float (+64 B) L1D cache-set skew stride.
+//
+// Interpolation cost vs. quality on C674x (no libm, 16-bit EMIFB SDRAM bus):
+//   - `zm_delay(d, x)`   : 1-tap integer delay (`de.delay(4096, d, x)` -> `sh_dread_i`).
+//                          Use for fixed comb/reverb taps or static pre-delays.
+//   - `zm_fdelay(d, x)`  /
+//     `zm_fdelay1(d, x)` : 2-point (1st-order) linear Lagrange interpolation
+//                          (`de.fdelay1(4096, d, x)` -> `sh_dread_1`).
+//                          Use for multi-grain pitch shifters (4-8 moving taps/frame)
+//                          or vintage digital rack emulations (Boss SE-50).
+//   - `zm_fdelay2(d, x)` : 3-point (2nd-order) quadratic Lagrange interpolation
+//                          (`de.fdelay2(4096, d, x)` -> `sh_dread_2`).
+//   - `zm_fdelay3(d, x)` : 4-point (3rd-order) cubic Lagrange interpolation
+//                          (`de.fdelay3(4096, d, x)` -> `sh_dread_3`).
+//                          Use for 1-2 swept Chorus / Through-Zero Flanger taps.
+zm_delay(d, x)   = de.delay(4096, d, x);
+zm_fdelay(d, x)  = de.fdelay(4096, d, x);
+zm_fdelay1(d, x) = de.fdelay1(4096, d, x);
+zm_fdelay2(d, x) = de.fdelay2(4096, d, x);
+zm_fdelay3(d, x) = de.fdelay3(4096, d, x);
+
+// ---- 5. Pedal Footswitch / Bypass State Helpers ----
+// Evaluate to 1.0 in standard desktop FAUST compilers; in `tools/faust2zd2.py`
+// map directly to hardware bypass crossfade (`fade >= 0.05f`) and trailing
+// `ON/OFF` mode (`LATCH` = 0.0, `UNLATCH` = 1.0).
+zm_fsw_active = 1.0;
+zm_is_unlatch = 1.0;

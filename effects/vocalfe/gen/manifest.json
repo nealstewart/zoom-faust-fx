@@ -1,0 +1,55 @@
+{
+  "name": "VocalFE",
+  "filename": "XXVOCLFE",
+  "id": "07001180",
+  "version": "1.00",
+  "display": "VOCAL FE",
+  "badge": "VF",
+  "description": "All-in-One Vocal Front-End: 2-pole Butterworth HPF, sidechain-filtered smart gate with hold and floor clamp, zero-latency relative split-band de-esser, and Pade tanh peak catcher.",
+  "dspload": 24,
+  "kernel": "vocalfe.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 80,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "HPF",
+      "max": 70,
+      "default": 20,
+      "explanation": "2-pole Butterworth high-pass cutoff (80..150 Hz)."
+    },
+    {
+      "name": "Gate",
+      "max": 40,
+      "default": 17,
+      "explanation": "Smart vocal gate open threshold (-55..-15 dBFS; close is 5 dB lower + 100 ms hold)."
+    },
+    {
+      "name": "Floor",
+      "max": 40,
+      "default": 22,
+      "explanation": "Gate closed floor clamp (-40..0 dB; default -18 dB tames feedback without dead dropouts)."
+    },
+    {
+      "name": "DeEss",
+      "max": 100,
+      "default": 55,
+      "explanation": "Relative split-band de-esser sensitivity (0..100; capped at -10 dB max cut)."
+    },
+    {
+      "name": "Drive",
+      "max": 24,
+      "default": 4,
+      "explanation": "Pre-clipper vocal drive / peak catcher ceiling push (0..12 dB)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Output level (80 is unity gain).",
+      "curve": "stock_vol"
+    }
+  ]
+}

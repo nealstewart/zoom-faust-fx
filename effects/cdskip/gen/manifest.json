@@ -1,0 +1,89 @@
+{
+  "name": "CDSkip",
+  "filename": "XXCDSKIP",
+  "id": "070011e0",
+  "version": "1.00",
+  "display": "CD SKIP",
+  "badge": "CD",
+  "description": "Scratched-CD / failing Discman tracking-skip & CIRC read-error burst looper (UNLATCH=retro grab, LATCH=auto transient) with laser-hunt, stereo desync, and clean Butterworth LPF.",
+  "dspload": 27,
+  "kernel": "cdskip.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 104,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Slice",
+      "max": 100,
+      "default": 40,
+      "explanation": "Base CD sector slice length on an exponential curve (13.3 ms = 1 CD frame to 2,000 ms)."
+    },
+    {
+      "name": "Skip",
+      "max": 100,
+      "default": 55,
+      "explanation": "Tracking jump & laser-hunt depth (0 = locked sector, 100 = random 1x..1/8x subdivisions & read-head slip)."
+    },
+    {
+      "name": "Error",
+      "max": 100,
+      "default": 50,
+      "explanation": "CIRC / Reed-Solomon error concealment burst rate (C2 mute dropouts, ZOH sample-freeze chirps, PCM bit-error crackle)."
+    },
+    {
+      "name": "RndMd",
+      "values": [
+        "STOMP",
+        "SLICE",
+        "BOTH"
+      ],
+      "default": 2,
+      "explanation": "When tracking jumps, laser slip, and error bursts re-roll: on STOMP, every SLICE wrap, or BOTH."
+    },
+    {
+      "name": "Click",
+      "max": 100,
+      "default": 75,
+      "explanation": "Sector splice hardness (100 = razor-sharp 0-sample CD jump, 0 = smooth 3.6 ms anti-click fade)."
+    },
+    {
+      "name": "Width",
+      "max": 100,
+      "default": 40,
+      "explanation": "Stereo desync (independent L/R micro-offset and occasional single-channel C2 dropouts)."
+    },
+    {
+      "name": "LPF",
+      "max": 100,
+      "default": 100,
+      "explanation": "Clean undriven 2-pole Butterworth LPF cutoff (500 Hz to 16 kHz; 100 = completely open/bypassed)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Wet output level (80 is unity at nominal MS-70CDR+ bus level).",
+      "curve": "stock_vol"
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 100,
+      "explanation": "Dry vs. wet crossfade when active (0..100%)."
+    },
+    {
+      "name": "ON/OFF",
+      "values": [
+        "LATCH",
+        "UNLATCH"
+      ],
+      "default": 1,
+      "footswitch_toggle": true,
+      "trailing": true,
+      "explanation": "LATCH: normal toggle. UNLATCH: momentary while held."
+    }
+  ],
+  "footswitch": {}
+}

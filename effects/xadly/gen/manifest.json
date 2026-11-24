@@ -1,0 +1,99 @@
+{
+  "name": "XADLY",
+  "filename": "XXXADLY",
+  "id": "070011f0",
+  "version": "1.00",
+  "display": "XA DLY",
+  "badge": "XA",
+  "description": "22.05 kHz half-rate / BBD hybrid stereo echo with 4 modes (Echo, Ping-Pong, Tape, Dark) and beat-synced subdivisions.",
+  "dspload": 30,
+  "kernel": "xadly.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 120,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Mode",
+      "values": [
+        "ECHO",
+        "PING",
+        "TAPE",
+        "DARK"
+      ],
+      "default": 0,
+      "explanation": "Echo topology (ECHO = PS1 stereo, PING = ping-pong, TAPE = multi-head space echo, DARK = deep BBD dub)."
+    },
+    {
+      "name": "Sync",
+      "values": [
+        "FREE",
+        "1/16",
+        "1/8T",
+        "1/8",
+        "1/4T",
+        "1/8.",
+        "1/4",
+        "1/4."
+      ],
+      "default": 0,
+      "explanation": "Beat-synced note subdivision (FREE = Time in 20..700 ms; 1/16..1/4. = beat-synced with Time as 60..200 BPM)."
+    },
+    {
+      "name": "Time",
+      "max": 100,
+      "default": 43,
+      "explanation": "Delay time (20..700 ms when Sync=FREE) or Tempo (60..200 BPM when beat-synced; 43 = 120 BPM)."
+    },
+    {
+      "name": "Fdbk",
+      "max": 95,
+      "default": 52,
+      "explanation": "Repeat feedback (0..95%; saturates safely into warm self-oscillation near max)."
+    },
+    {
+      "name": "Tone",
+      "max": 100,
+      "default": 48,
+      "explanation": "SPU vIIR / BBD clock darkening on repeats (0 = bright 8.5 kHz SPU, 100 = dark 1.2 kHz BBD)."
+    },
+    {
+      "name": "Mod",
+      "max": 100,
+      "default": 25,
+      "explanation": "BBD clock warble / chorus modulation depth on repeats (0..100%)."
+    },
+    {
+      "name": "Grit",
+      "max": 100,
+      "default": 35,
+      "explanation": "PS1 SPU 16-bit RAM saturation and progressive lo-fi repeat grit (0..100%)."
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 45,
+      "explanation": "Dry/Wet blend (0 = dry, 50 = unity dry + wet, 100 = 100% wet)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Master output level (80 is unity).",
+      "curve": "stock_vol"
+    },
+    {
+      "name": "ON/OFF",
+      "values": [
+        "LATCH",
+        "UNLATCH"
+      ],
+      "default": 0,
+      "footswitch_toggle": true,
+      "trailing": true,
+      "explanation": "LATCH: normal toggle. UNLATCH: momentary while held."
+    }
+  ],
+  "footswitch": {}
+}
