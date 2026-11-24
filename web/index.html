@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#0c0e12" />
+  <meta name="theme-color" content="#0d74b0" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>Stomphacks — ZD2 WebAssembly Auditioner</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>FAUST FX — WebAssembly Pedalboard Auditioner</title>
+  <link rel="stylesheet" href="styles.css?v=3" />
 </head>
 <body>
   <!-- Shared SVG definitions for rotary knobs -->
   <svg aria-hidden="true" width="0" height="0" style="position:absolute;pointer-events:none">
     <defs>
       <linearGradient id="knobGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#3b475e" />
-        <stop offset="100%" stop-color="#181f2c" />
+        <stop offset="0%" stop-color="#3c434f" />
+        <stop offset="100%" stop-color="#171a20" />
       </linearGradient>
     </defs>
   </svg>
@@ -24,10 +24,10 @@
     <header class="topbar">
       <div class="topbar-head">
         <div class="brand">
-          <div class="brand-logo">SH</div>
+          <div class="brand-logo">FX</div>
           <div>
-            <h1>STOMPHACKS <span class="badge-wasm">WASM DSP</span></h1>
-            <div class="subtitle">Zoom MS Plus ZD2 Browser Auditioner · 44.1 kHz / 16-sample blocks</div>
+            <h1>FAUST FX <span class="badge-wasm">WASM DSP</span></h1>
+            <div class="subtitle">WebAssembly Pedalboard Auditioner · 44.1 kHz / 16-sample blocks</div>
           </div>
         </div>
         <div class="topbar-mobile-actions mobile-only">
@@ -217,6 +217,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=3"></script>
 </body>
 </html>

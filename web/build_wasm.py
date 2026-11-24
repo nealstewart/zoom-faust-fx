@@ -128,12 +128,17 @@ void {fn_name}(void **instance, void **ctx);
 
 def make_wasm_shim(fn_name: str, enriched_params: list[dict], needs_sdram: bool) -> str:
     sdram_bytes = 1048576 if needs_sdram else 4096
+    default_unlatch = any(
+        p.get("footswitchToggle") and p.get("default", 0) == 1
+        for p in enriched_params
+    )
+    init_bypass = "0.0f" if default_unlatch else "1.0f"
     init_coefs = "\n".join(
         f"    g_coef[{p['slot']}] = {float(p['defaultCoeff']):.9f}f;"
         for p in enriched_params
     )
     return f"""
-/* ==== Stomphacks WebAssembly AudioWorklet Shim ==== */
+/* ==== WebAssembly AudioWorklet Shim ==== */
 #include <stddef.h>
 #include <stdint.h>
 
@@ -166,8 +171,8 @@ static void    *g_instance[4];
 static void    *g_ctx[9];
 static uint8_t  g_sdram[WASM_SDRAM_BYTES] __attribute__((aligned(16)));
 
-static float    g_bypass_target = 1.0f;
-static float    g_bypass_cur    = 1.0f;
+static float    g_bypass_target = {init_bypass};
+static float    g_bypass_cur    = {init_bypass};
 
 __attribute__((export_name("wasm_init")))
 void wasm_init(void) {{
@@ -184,9 +189,9 @@ void wasm_init(void) {{
 
     g_state[SH_STATE_GUARD_WORD] = SH_STATE_GUARD;
 
-    g_bypass_target = 1.0f;
-    g_bypass_cur    = 1.0f;
-    g_coef[0]       = 1.0f;
+    g_bypass_target = {init_bypass};
+    g_bypass_cur    = {init_bypass};
+    g_coef[0]       = {init_bypass};
 {init_coefs}
 
     uint32_t base = (uint32_t)(uintptr_t)&g_sdram[0];

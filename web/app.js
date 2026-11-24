@@ -368,6 +368,8 @@ async function addEffectToChain(slug, replaceAll = false, insertIndex = null) {
     values,
     bypassed: false,
   };
+  // Default-unlatched momentary effects (e.g. STUT RTCH) start bypassed until held
+  slotObj.bypassed = isSlotMomentary(slotObj);
 
   const idx =
     typeof insertIndex === "number" && insertIndex >= 0 && insertIndex <= state.chain.length
@@ -1528,12 +1530,10 @@ function renderPedalboard() {
     const headLedBtn = document.createElement("button");
     headLedBtn.type = "button";
     headLedBtn.className = "pedal-head-led mobile-only";
-    headLedBtn.title = "Toggle effect bypass";
+    headLedBtn.title = "Toggle effect bypass (hold for momentary UNLATCH)";
     headLedBtn.setAttribute("aria-label", `Toggle ${fx.display} bypass`);
     headLedBtn.innerHTML = `<span class="footswitch-led"></span>`;
-    headLedBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      setSlotBypass(slotObj, !slotObj.bypassed);
+    const syncLedUI = () => {
       card.classList.toggle("bypassed", slotObj.bypassed);
       const fsw = card.querySelector(".footswitch-btn");
       if (fsw) {
@@ -1541,7 +1541,32 @@ function renderPedalboard() {
         const modeTag = mom ? "HOLD (UNLATCH)" : slotObj.bypassed ? "BYPASSED" : "ENGAGED";
         fsw.innerHTML = `<span class="footswitch-led"></span> ${modeTag}`;
       }
+    };
+    headLedBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isSlotMomentary(slotObj)) {
+        try {
+          headLedBtn.setPointerCapture(e.pointerId);
+        } catch (_) {}
+        setSlotBypass(slotObj, false);
+        syncLedUI();
+      } else {
+        setSlotBypass(slotObj, !slotObj.bypassed);
+        syncLedUI();
+      }
     });
+    const releaseHeadMomentary = () => {
+      if (isSlotMomentary(slotObj) && !slotObj.bypassed) {
+        setSlotBypass(slotObj, true);
+        syncLedUI();
+      }
+    };
+    headLedBtn.addEventListener("pointerup", releaseHeadMomentary);
+    headLedBtn.addEventListener("pointercancel", releaseHeadMomentary);
+    headLedBtn.addEventListener("pointerleave", releaseHeadMomentary);
+    headLedBtn.addEventListener("lostpointercapture", releaseHeadMomentary);
+    headLedBtn.addEventListener("click", (e) => e.stopPropagation());
 
     const headIcon = document.createElement("div");
     headIcon.className = "pedal-head-icon mobile-only";
@@ -1591,6 +1616,7 @@ function renderPedalboard() {
     resetBtn.title = "Reset parameters to defaults";
     resetBtn.onclick = () => {
       for (const p of fx.params) setSlotParam(slotObj, p, p.default);
+      if (isSlotMomentary(slotObj)) setSlotBypass(slotObj, true);
       renderPedalboard();
     };
 
@@ -1723,11 +1749,11 @@ function startAnimationLoop() {
 
     const w = canvas.width;
     const h = canvas.height;
-    g.fillStyle = "#0a141c";
+    g.fillStyle = "#12f094";
     g.fillRect(0, 0, w, h);
 
-    // Subtle grid center line
-    g.strokeStyle = "rgba(56, 189, 248, 0.14)";
+    // Subtle LCD grid center line
+    g.strokeStyle = "rgba(4, 59, 36, 0.24)";
     g.lineWidth = 1;
     g.beginPath();
     g.moveTo(0, h / 2);
@@ -1738,8 +1764,8 @@ function startAnimationLoop() {
 
     if (state.scopeMode === "scope") {
       state.analyser.getFloatTimeDomainData(timeBuf);
-      g.strokeStyle = "#38bdf8";
-      g.lineWidth = 1.5;
+      g.strokeStyle = "#043b24";
+      g.lineWidth = 1.75;
       g.beginPath();
       const step = w / timeBuf.length;
       for (let i = 0; i < timeBuf.length; i++) {
@@ -1752,7 +1778,7 @@ function startAnimationLoop() {
       state.analyser.getByteFrequencyData(freqBuf);
       const bins = 64;
       const barW = w / bins;
-      g.fillStyle = "#38bdf8";
+      g.fillStyle = "#043b24";
       for (let i = 0; i < bins; i++) {
         const v = freqBuf[i * 2] / 255;
         const bh = v * (h - 4);
