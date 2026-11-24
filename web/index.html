@@ -70,13 +70,13 @@
     <!-- Audio Source Bar -->
     <section class="source-bar">
       <div class="source-tabs" role="tablist">
-        <button class="tab-btn active" data-source="sample">Dry Samples / File</button>
-        <button class="tab-btn" data-source="synth">Test Synth</button>
+        <button class="tab-btn active" data-source="synth">Test Synth</button>
+        <button class="tab-btn" data-source="sample">Dry Samples / File</button>
         <button class="tab-btn" data-source="mic">Live Mic / Guitar</button>
       </div>
 
       <!-- Sample / File Player -->
-      <div id="panel-sample" class="source-panel active">
+      <div id="panel-sample" class="source-panel">
         <select id="sampleSelect" class="select-input"></select>
         <button id="playSampleBtn" class="btn btn-primary">▶ Play</button>
         <button id="loopSampleBtn" class="btn btn-toggle active" title="Loop playback">↻ Loop</button>
@@ -91,7 +91,7 @@
       </div>
 
       <!-- Test Synth (TB-303 Acid Sequencer & Keyboard) -->
-      <div id="panel-synth" class="source-panel">
+      <div id="panel-synth" class="source-panel active">
         <select id="synthVoiceSelect" class="select-input">
           <option value="acid_saw">TB-303 Acid Saw</option>
           <option value="acid_sqr">TB-303 Acid Square</option>

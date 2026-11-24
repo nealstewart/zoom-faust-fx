@@ -56,7 +56,7 @@ const state = {
   masterMix: 1.0,
 
   // Sample player
-  activeSourceTab: "sample",
+  activeSourceTab: "synth",
   sampleBuffers: new Map(), // url -> AudioBuffer
   currentBuffer: null,
   currentBufferLabel: "",
@@ -1411,11 +1411,18 @@ async function init() {
   // Populate dry samples dropdown
   const sel = $("sampleSelect");
   sel.innerHTML = "";
-  for (const s of state.catalog.samples) {
+  if (state.catalog.samples.length === 0) {
     const opt = document.createElement("option");
-    opt.value = s.url;
-    opt.textContent = s.label;
+    opt.value = "__custom__";
+    opt.textContent = "No bundled samples — click + Load Audio";
     sel.appendChild(opt);
+  } else {
+    for (const s of state.catalog.samples) {
+      const opt = document.createElement("option");
+      opt.value = s.url;
+      opt.textContent = s.label;
+      sel.appendChild(opt);
+    }
   }
 
   renderCategories();
