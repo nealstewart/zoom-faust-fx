@@ -1,5 +1,7 @@
 # zoom-faust-fx
 
+> **[Try the Live WebAssembly Browser Auditioner →](https://nealstewart.github.io/zoom-faust-fx/)**
+
 > [!WARNING]
 > **Experimental software — use at your own risk.** This project compiles and loads unofficial bare-metal DSP binaries onto physical Zoom MultiStomp Plus pedals. Not all generated effects or compiler paths have been exhaustively validated on hardware, and bugs could crash, freeze, or otherwise affect your pedal. Always back up your pedal first (see `vendor/stomphacks/SAFETY.md`) and use this project strictly at your own risk.
 
