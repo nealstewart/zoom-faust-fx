@@ -2,30 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0c0e12" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <title>Stomphacks — ZD2 WebAssembly Auditioner</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- Shared SVG definitions for rotary knobs -->
+  <svg aria-hidden="true" width="0" height="0" style="position:absolute;pointer-events:none">
+    <defs>
+      <linearGradient id="knobGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#3b475e" />
+        <stop offset="100%" stop-color="#181f2c" />
+      </linearGradient>
+    </defs>
+  </svg>
   <div class="app-shell">
     <!-- Top Header & Transport -->
     <header class="topbar">
-      <div class="brand">
-        <div class="brand-logo">SH</div>
-        <div>
-          <h1>STOMPHACKS <span class="badge-wasm">WASM DSP</span></h1>
-          <div class="subtitle">Zoom MS Plus ZD2 Browser Auditioner · 44.1 kHz / 16-sample blocks</div>
+      <div class="topbar-head">
+        <div class="brand">
+          <div class="brand-logo">SH</div>
+          <div>
+            <h1>STOMPHACKS <span class="badge-wasm">WASM DSP</span></h1>
+            <div class="subtitle">Zoom MS Plus ZD2 Browser Auditioner · 44.1 kHz / 16-sample blocks</div>
+          </div>
+        </div>
+        <div class="topbar-mobile-actions mobile-only">
+          <button id="mobileBypassBtn" type="button" class="btn btn-sm btn-bypass" title="Global Bypass">
+            <span class="led"></span> ON
+          </button>
+          <button id="toggleMasterBtn" type="button" class="btn btn-sm btn-ghost" aria-expanded="false" title="Show/hide mixer & oscilloscope">
+            Mix ▾
+          </button>
         </div>
       </div>
 
       <!-- Oscilloscope / Spectrum -->
-      <div class="scope-box" title="Click to switch Oscilloscope / Spectrum">
+      <div class="scope-box mobile-collapsible" title="Click to switch Oscilloscope / Spectrum">
         <canvas id="scopeCanvas" width="240" height="48"></canvas>
         <span id="scopeModeLabel" class="scope-label">SCOPE</span>
       </div>
 
       <!-- Master Controls & VU Meters -->
-      <div class="master-bar">
+      <div class="master-bar mobile-collapsible">
         <div class="meter-group" title="Input Peak L/R">
           <span class="meter-tag">IN</span>
           <div class="meter-bars">
@@ -92,29 +114,35 @@
 
       <!-- Test Synth (TB-303 Acid Sequencer & Keyboard) -->
       <div id="panel-synth" class="source-panel active">
-        <select id="synthVoiceSelect" class="select-input">
-          <option value="acid_saw">TB-303 Acid Saw</option>
-          <option value="acid_sqr">TB-303 Acid Square</option>
-          <option value="pluck">Pluck</option>
-          <option value="pad">Warm Pad</option>
-        </select>
-        <select id="acidPatternSelect" class="select-input" title="16-step 303 acid pattern (synced to toolbar BPM)">
-          <option value="acid1">Acid 1 (Classic)</option>
-          <option value="acid2">Acid 2 (Phuture)</option>
-          <option value="ebm">EBM Octave</option>
-          <option value="minimal">Dark Minimal</option>
-        </select>
-        <button id="autoRiffBtn" class="btn btn-primary">▶ 303 Loop</button>
-        <button id="acidRandBtn" class="btn btn-ghost btn-sm" title="Generate a new random 16-step acid bassline">🎲</button>
-        <label class="mini-slider" title="303 Filter Cutoff">
-          <span>CUT</span>
-          <input id="acidCutoffSlider" type="range" min="0" max="100" value="38" />
-        </label>
-        <label class="mini-slider" title="303 Filter Resonance (Squelch)">
-          <span>RES</span>
-          <input id="acidResSlider" type="range" min="0" max="100" value="72" />
-        </label>
-        <div id="miniKeyboard" class="mini-keyboard" title="Click keys or use computer keys A-K"></div>
+        <div class="synth-primary">
+          <button id="autoRiffBtn" class="btn btn-primary">▶ 303 Loop</button>
+          <button id="acidRandBtn" class="btn btn-ghost btn-sm" title="Generate a new random 16-step acid bassline">🎲</button>
+          <button id="toggleSynthExtrasBtn" type="button" class="btn btn-ghost btn-sm mobile-only" aria-expanded="false" title="Show/hide synth voice, filter & keyboard">Tone ▾</button>
+        </div>
+        <div id="synthExtras" class="synth-extras">
+          <select id="synthVoiceSelect" class="select-input">
+            <option value="acid_saw">TB-303 Acid Saw</option>
+            <option value="acid_sqr">TB-303 Acid Square</option>
+            <option value="pluck">Pluck</option>
+            <option value="pad">Dreamy Pad</option>
+          </select>
+          <select id="acidPatternSelect" class="select-input" title="Synth sequence pattern (synced to toolbar BPM)">
+            <option value="acid1">Acid 1 (Classic)</option>
+            <option value="acid2">Acid 2 (Phuture)</option>
+            <option value="ebm">EBM Octave</option>
+            <option value="minimal">Dark Minimal</option>
+            <option value="dreamy_pad">Dreamy Pad (Long)</option>
+          </select>
+          <label class="mini-slider" title="303 Filter Cutoff">
+            <span>CUT</span>
+            <input id="acidCutoffSlider" type="range" min="0" max="100" value="38" />
+          </label>
+          <label class="mini-slider" title="303 Filter Resonance (Squelch)">
+            <span>RES</span>
+            <input id="acidResSlider" type="range" min="0" max="100" value="72" />
+          </label>
+          <div id="miniKeyboard" class="mini-keyboard" title="Click keys or use computer keys A-K"></div>
+        </div>
       </div>
 
       <!-- Live Mic / Interface -->
@@ -127,16 +155,21 @@
       </div>
 
       <div class="audio-status">
-        <span id="audioCtxState" class="status-pill">Audio: Click Play or a Key to Start</span>
+        <button id="audioCtxState" type="button" class="status-pill status-pill-btn" title="Tap to start or resume audio">Audio: Tap Play or a Key to Start</button>
       </div>
     </section>
 
     <!-- Main Workspace -->
     <div class="workspace">
+      <div id="sidebarBackdrop" class="sidebar-backdrop" aria-hidden="true"></div>
+
       <!-- Left Sidebar: Effect Catalog -->
-      <aside class="sidebar">
+      <aside id="sidebar" class="sidebar">
         <div class="sidebar-head">
-          <h2>ZD2 Effects (<span id="effectCount">0</span>)</h2>
+          <div class="sidebar-head-row">
+            <h2>ZD2 Effects (<span id="effectCount">0</span>)</h2>
+            <button id="closeSidebarBtn" type="button" class="icon-btn mobile-only" aria-label="Close effects catalog">×</button>
+          </div>
           <input id="searchInput" type="search" class="search-input" placeholder="Search effects..." />
           <div id="categoryPills" class="category-pills"></div>
         </div>
@@ -147,6 +180,7 @@
       <main class="stage">
         <div class="stage-toolbar">
           <div class="chain-info">
+            <button id="openSidebarBtn" type="button" class="btn btn-primary btn-sm mobile-only">+ Effects</button>
             <span class="chain-label">SIGNAL CHAIN</span>
             <span id="chainSummary" class="mono muted">IN → (empty) → OUT</span>
           </div>

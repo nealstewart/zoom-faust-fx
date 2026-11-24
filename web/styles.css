@@ -33,6 +33,12 @@ html, body {
   font-size: 13px;
   overflow: hidden;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, input, select {
+  touch-action: manipulation;
 }
 
 .mono {
@@ -47,11 +53,16 @@ html, body {
   display: none !important;
 }
 
+.mobile-only {
+  display: none !important;
+}
+
 /* App Shell */
 .app-shell {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
 }
 
@@ -391,6 +402,15 @@ html, body {
   color: var(--text-dim);
 }
 
+.status-pill-btn {
+  cursor: pointer;
+}
+
+.status-pill-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 .status-pill.running {
   color: var(--green);
   border-color: rgba(34, 197, 94, 0.4);
@@ -418,6 +438,8 @@ html, body {
   display: grid;
   place-items: end center;
   padding-bottom: 2px;
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 .key-btn.black {
@@ -826,28 +848,29 @@ html, body {
 .pedal-hero {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  background: rgba(8, 14, 22, 0.55);
+  gap: 14px;
+  padding: 12px 14px;
+  background: rgba(8, 14, 22, 0.65);
   border-bottom: 1px solid var(--border);
 }
 
 .pedal-art {
-  width: 72px;
-  height: 97px;
+  width: 84px;
+  height: 113px;
   flex-shrink: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: #ffffff;
   border: 2px solid var(--border-hi);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
   display: grid;
   place-items: center;
   overflow: hidden;
 }
 
 .pedal-art img {
-  width: 72px;
-  height: 97px;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   display: block;
   image-rendering: pixelated;
 }
@@ -855,14 +878,11 @@ html, body {
 .pedal-desc {
   flex: 1;
   min-width: 0;
-  font-size: 11px;
-  color: var(--text-dim);
-  line-height: 1.4;
-  max-height: 97px;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 6;
-  -webkit-box-orient: vertical;
+  font-size: 12.5px;
+  color: #cbd5e1;
+  line-height: 1.48;
+  max-height: 115px;
+  overflow-y: auto;
 }
 
 /* Params Grid */
@@ -997,6 +1017,8 @@ html, body {
   justify-content: center;
   gap: 8px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 .footswitch-btn:active {
@@ -1052,4 +1074,675 @@ html, body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--border-hi);
+}
+
+/* Desktop pass-through wrappers so mobile grouping doesn't affect desktop layout */
+.topbar-head,
+.synth-primary,
+.synth-extras {
+  display: contents;
+}
+
+/* Sidebar header row & mobile drawer backdrop */
+.sidebar-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+/* Touch-only devices: hide desktop drag handles */
+@media (hover: none) and (pointer: coarse) {
+  .drag-grip {
+    display: none;
+  }
+
+  .effect-item,
+  .pedal-head[draggable="true"] {
+    cursor: default;
+  }
+}
+
+/* Responsive / Minimal Mobile Layout */
+@media (max-width: 860px) {
+  html, body {
+    height: auto;
+    min-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.drawer-open {
+    overflow: hidden;
+  }
+
+  .mobile-only {
+    display: inline-flex !important;
+  }
+
+  #closeSidebarBtn.mobile-only,
+  .pedal-head-led.mobile-only,
+  .pedal-head-icon.mobile-only {
+    display: grid !important;
+  }
+
+  .effect-desc.mobile-only {
+    display: -webkit-box !important;
+  }
+
+  .app-shell {
+    height: auto;
+    min-height: 100dvh;
+    width: 100%;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Slim sticky topbar with large buttons & collapsible Mix/Scope */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .topbar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .brand {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .brand-logo {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .brand h1 {
+    font-size: 14px;
+  }
+
+  .badge-wasm,
+  .subtitle {
+    display: none;
+  }
+
+  .topbar-mobile-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  #mobileBypassBtn {
+    min-width: 72px;
+    min-height: 40px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  #toggleMasterBtn {
+    min-height: 40px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  /* Collapsible scope + master mixer (hidden until Mix tapped) */
+  .topbar .mobile-collapsible {
+    display: none;
+  }
+
+  .topbar.master-open .scope-box.mobile-collapsible {
+    display: block;
+    width: 100%;
+  }
+
+  .topbar.master-open .master-bar.mobile-collapsible {
+    display: flex;
+    width: 100%;
+    gap: 10px;
+    padding-top: 2px;
+  }
+
+  .topbar.master-open #globalBypassBtn {
+    display: none;
+  }
+
+  .scope-box canvas {
+    width: 100%;
+    height: 44px;
+  }
+
+  .meter-group {
+    display: none;
+  }
+
+  .mini-slider {
+    flex: 1 1 110px;
+    min-height: 36px;
+  }
+
+  .mini-slider input[type="range"] {
+    flex: 1;
+    min-width: 56px;
+    width: auto;
+  }
+
+  /* Minimal source bar with large buttons */
+  .source-bar {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .source-tabs {
+    width: 100%;
+    padding: 3px;
+    border-radius: 10px;
+  }
+
+  .tab-btn {
+    flex: 1;
+    min-height: 40px;
+    padding: 8px 6px;
+    font-size: 13px;
+    border-radius: 7px;
+    text-align: center;
+  }
+
+  .source-panel {
+    flex: 1 1 100%;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .synth-primary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  #autoRiffBtn {
+    flex: 1 1 auto;
+    min-height: 48px;
+    font-size: 15px;
+    justify-content: center;
+    border-radius: 10px;
+  }
+
+  #acidRandBtn {
+    min-width: 48px;
+    min-height: 48px;
+    justify-content: center;
+    font-size: 18px;
+    border-radius: 10px;
+  }
+
+  #toggleSynthExtrasBtn {
+    min-height: 48px;
+    padding: 0 14px;
+    font-size: 13px;
+    border-radius: 10px;
+  }
+
+  /* Secondary synth controls collapsed by default on mobile */
+  .synth-extras {
+    display: none;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+  }
+
+  .synth-extras.open {
+    display: flex;
+  }
+
+  .source-panel .select-input {
+    flex: 1 1 150px;
+    min-width: 0;
+    min-height: 44px;
+    border-radius: 9px;
+  }
+
+  #playSampleBtn,
+  #micEnableBtn {
+    flex: 1 1 140px;
+    min-height: 48px;
+    font-size: 15px;
+    justify-content: center;
+    border-radius: 10px;
+  }
+
+  #loopSampleBtn,
+  .file-upload-btn {
+    min-height: 48px;
+    justify-content: center;
+    border-radius: 10px;
+  }
+
+  .scrub-wrap {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  /* Only show audio status pill on mobile when attention/resume is needed */
+  .audio-status {
+    margin-left: 0;
+    width: 100%;
+    display: flex;
+  }
+
+  .audio-status .status-pill {
+    display: none;
+    width: 100%;
+    text-align: center;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .audio-status .status-pill.needs-attention {
+    display: block;
+    color: var(--amber);
+    border-color: rgba(245, 158, 11, 0.45);
+    background: rgba(245, 158, 11, 0.1);
+  }
+
+  /* Touch-friendly mini keyboard */
+  .mini-keyboard {
+    width: 100%;
+    height: 52px;
+    gap: 3px;
+  }
+
+  .key-btn {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 20px;
+    font-size: 10px;
+    padding-bottom: 5px;
+  }
+
+  .key-btn.black {
+    flex: 0.85 1 0;
+    width: auto;
+  }
+
+  /* Prevent iOS Safari auto-zoom on input/select focus */
+  .search-input,
+  .select-input,
+  .bpm-input {
+    font-size: 16px;
+  }
+
+  /* Large, comfortable touch buttons */
+  .btn {
+    min-height: 44px;
+    padding: 9px 14px;
+    font-size: 14px;
+    border-radius: 9px;
+  }
+
+  .btn-sm {
+    min-height: 42px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 15px;
+    border-radius: 8px;
+  }
+
+  .seg-btn {
+    min-height: 42px;
+    padding: 8px 10px;
+    font-size: 12px;
+    border-radius: 8px;
+  }
+
+  .footswitch-btn {
+    min-height: 52px;
+    padding: 12px 16px;
+    font-size: 13px;
+    border-radius: 12px;
+  }
+
+  .knob-wrap,
+  .knob-svg {
+    width: 68px;
+    height: 68px;
+  }
+
+  /* Workspace & slide-over Effect Catalog drawer */
+  .workspace {
+    display: block;
+    flex: 1;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(4, 7, 12, 0.72);
+    z-index: 55;
+    display: none;
+  }
+
+  .sidebar-backdrop.visible {
+    display: block;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(360px, 90vw);
+    max-width: 100%;
+    z-index: 60;
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+    box-shadow: 12px 0 32px rgba(0, 0, 0, 0.65);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .category-pills {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cat-pill {
+    flex-shrink: 0;
+    min-height: 34px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .effect-item {
+    padding: 12px;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .effect-icon {
+    width: 54px;
+    height: 72px;
+    border-radius: 7px;
+    border-width: 2px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  }
+
+  .effect-title {
+    font-size: 14px;
+  }
+
+  .effect-desc {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #cbd5e1;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .effect-actions {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .effect-actions .btn-sm {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 12px;
+    justify-content: center;
+  }
+
+  /* Simplified stage toolbar with large action buttons */
+  .stage {
+    min-height: 55vh;
+  }
+
+  .stage-toolbar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .chain-info {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .chain-label,
+  #chainSummary {
+    display: none;
+  }
+
+  #openSidebarBtn {
+    width: 100%;
+    min-height: 46px;
+    justify-content: center;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+
+  .preset-group {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .preset-group > .muted {
+    display: none;
+  }
+
+  .bpm-box {
+    display: none;
+  }
+
+  .preset-group .select-input {
+    flex: 1 1 180px;
+    min-width: 0;
+    min-height: 44px;
+    border-radius: 9px;
+  }
+
+  #clearChainBtn {
+    min-height: 44px;
+    padding: 8px 14px;
+  }
+
+  /* Vertical Accordion Pedalboard — only one effect open at a time */
+  .pedalboard {
+    flex-direction: column;
+    align-items: stretch;
+    overflow: visible;
+    padding: 10px 12px 24px;
+    gap: 10px;
+  }
+
+  .pedal-card {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    border-radius: 14px;
+  }
+
+  .pedal-head {
+    min-height: 56px;
+    padding: 10px 12px;
+    cursor: pointer;
+  }
+
+  .drag-grip {
+    display: none;
+  }
+
+  .pedal-head-led {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-hi);
+    background: var(--bg-2);
+    place-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+  }
+
+  .pedal-head-led .footswitch-led {
+    width: 15px;
+    height: 15px;
+  }
+
+  .pedal-head-icon {
+    width: 80px;
+    height: 108px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 2px solid var(--border-hi);
+    place-items: center;
+    overflow: hidden;
+    flex-shrink: 0;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  }
+
+  .pedal-head-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+
+  .pedal-card.expanded .pedal-head-icon.mobile-only {
+    display: none !important;
+  }
+
+  .pedal-name {
+    font-size: 19px;
+  }
+
+  .pedal-zd2 {
+    display: none;
+  }
+
+  .pedal-chevron {
+    margin-left: auto;
+    color: var(--text-dim);
+    font-size: 20px;
+    padding: 0 4px;
+    flex-shrink: 0;
+  }
+
+  .seg-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+    gap: 6px;
+  }
+
+  .seg-btn {
+    min-width: 0;
+  }
+
+  /* Collapsed effect card: tall, chunky stompbox tile with prominent icon */
+  .pedal-card.collapsed .pedal-head {
+    border-bottom: none;
+    min-height: 140px;
+    padding: 16px 14px;
+    gap: 12px;
+  }
+
+  .pedal-card.collapsed .pedal-tools {
+    display: grid;
+    grid-template-columns: repeat(2, 40px);
+    gap: 6px;
+  }
+
+  .pedal-card.collapsed .pedal-tools .icon-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+
+  .pedal-card.collapsed .pedal-hero,
+  .pedal-card.collapsed .pedal-params,
+  .pedal-card.collapsed .pedal-footer {
+    display: none;
+  }
+
+  /* Expanded effect card: prominent pixel-art icon + high-contrast readable description */
+  .pedal-hero {
+    padding: 16px 14px;
+    gap: 14px;
+    align-items: center;
+    background: linear-gradient(180deg, rgba(10, 20, 32, 0.9) 0%, rgba(12, 18, 28, 0.65) 100%);
+  }
+
+  .pedal-art {
+    width: 108px;
+    height: 145px;
+    border-radius: 9px;
+    border: 2px solid var(--accent);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55), 0 0 14px rgba(56, 189, 248, 0.16);
+  }
+
+  .pedal-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .pedal-desc {
+    font-size: 14px;
+    line-height: 1.55;
+    color: #e2e8f0;
+    max-height: none;
+    overflow: visible;
+    display: block;
+    -webkit-line-clamp: unset;
+  }
+
+  .pedal-params {
+    padding: 14px 12px;
+    gap: 16px 10px;
+  }
+
+  .param-label {
+    font-size: 12px;
+  }
+
+  .param-val {
+    font-size: 12px;
+  }
+
+  .empty-board {
+    width: 100%;
+    padding: 24px 16px;
+  }
 }

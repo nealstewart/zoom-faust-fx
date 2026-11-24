@@ -41,6 +41,7 @@ const state = {
   // Chain
   chain: [], // [{ id, slug, effect, values: Map<index, int>, bypassed: bool }]
   nextSlotId: 1,
+  expandedSlotId: null, // Only one effect expanded at a time on mobile accordion
 
   // Web Audio
   ctx: null,
@@ -48,6 +49,7 @@ const state = {
   inputBus: null,
   analyser: null,
   audioReady: false,
+  audioInitPromise: null,
 
   // Master
   globalBypass: false,
@@ -143,78 +145,160 @@ function formatTime(sec) {
 }
 
 // ---- Web Audio Engine ----
+function setAudioSessionType(type) {
+  try {
+    if (navigator.audioSession && "type" in navigator.audioSession) {
+      navigator.audioSession.type = type;
+    }
+  } catch (_) {}
+}
+
+function unlockAudioContextSync(ctx) {
+  // iOS Safari requires resume() + a brief silent buffer synchronously inside the user gesture,
+  // before any await (like audioWorklet.addModule or fetch) breaks user activation.
+  try {
+    const p = ctx.resume();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+  } catch (_) {}
+  try {
+    const buf = ctx.createBuffer(1, 1, ctx.sampleRate || 44100);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch (_) {}
+}
+
 async function ensureAudio() {
-  if (state.audioReady) {
-    if (state.ctx.state === "suspended") {
-      await state.ctx.resume();
+  if (state.audioReady && state.ctx) {
+    if (state.ctx.state !== "running") {
+      try {
+        await state.ctx.resume();
+      } catch (_) {}
     }
     updateAudioStatus();
     return;
   }
 
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const ctx = new AudioCtx({ sampleRate: 44100 });
-  await ctx.audioWorklet.addModule("worklet-processor.js");
-
-  const inputBus = ctx.createGain();
-  const worklet = new AudioWorkletNode(ctx, "stomphacks-processor", {
-    numberOfInputs: 1,
-    numberOfOutputs: 1,
-    outputChannelCount: [2],
-  });
-  const analyser = ctx.createAnalyser();
-  analyser.fftSize = 1024;
-  analyser.smoothingTimeConstant = 0.78;
-
-  inputBus.connect(worklet);
-  worklet.connect(analyser);
-  analyser.connect(ctx.destination);
-
-  worklet.port.onmessage = (ev) => {
-    const msg = ev.data;
-    if (!msg) return;
-    if (msg.type === "meters") {
-      updateMeters(msg.inL, msg.inR, msg.outL, msg.outR);
-    } else if (msg.type === "slotError") {
-      console.error("WASM slot error:", msg);
-      $("audioCtxState").textContent = `WASM Error: ${msg.error}`;
+  // If initialization is already in flight, still try to resume synchronously on this gesture
+  if (state.audioInitPromise) {
+    if (state.ctx && state.ctx.state !== "running") {
+      unlockAudioContextSync(state.ctx);
     }
-  };
+    return state.audioInitPromise;
+  }
 
+  // iOS 17+ Safari: play Web Audio even when the hardware Silent/Ring switch is muted
+  setAudioSessionType("playback");
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) {
+    $("audioCtxState").textContent = "Audio Error: Web Audio not supported";
+    throw new Error("Web Audio API is not supported in this browser.");
+  }
+
+  let ctx;
+  try {
+    ctx = new AudioCtx({ sampleRate: 44100 });
+  } catch (_) {
+    // Fallback for mobile devices / Bluetooth outputs that reject a forced 44.1 kHz rate
+    ctx = new AudioCtx();
+  }
   state.ctx = ctx;
-  state.inputBus = inputBus;
-  state.worklet = worklet;
-  state.analyser = analyser;
-  state.audioReady = true;
+  ctx.addEventListener("statechange", updateAudioStatus);
 
-  // Push current master settings
-  syncMasterToWorklet();
+  // Unlock synchronously inside the user gesture BEFORE any await!
+  unlockAudioContextSync(ctx);
 
-  // Instantiate any slots already placed on the board before audio started
-  for (let i = 0; i < state.chain.length; i++) {
-    await pushSlotToWorklet(state.chain[i], i);
-  }
+  state.audioInitPromise = (async () => {
+    try {
+      if (!ctx.audioWorklet) {
+        const msg = window.isSecureContext
+          ? "Audio Error: AudioWorklet not supported"
+          : "Audio Error: HTTPS required for AudioWorklet";
+        $("audioCtxState").textContent = msg;
+        throw new Error(msg);
+      }
 
-  if (ctx.state === "suspended") {
-    await ctx.resume();
-  }
-  updateAudioStatus();
+      await ctx.audioWorklet.addModule("worklet-processor.js");
+
+      const inputBus = ctx.createGain();
+      const worklet = new AudioWorkletNode(ctx, "stomphacks-processor", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+      });
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.78;
+
+      inputBus.connect(worklet);
+      worklet.connect(analyser);
+      analyser.connect(ctx.destination);
+
+      worklet.port.onmessage = (ev) => {
+        const msg = ev.data;
+        if (!msg) return;
+        if (msg.type === "meters") {
+          updateMeters(msg.inL, msg.inR, msg.outL, msg.outR);
+        } else if (msg.type === "slotError") {
+          console.error("WASM slot error:", msg);
+          $("audioCtxState").textContent = `WASM Error: ${msg.error}`;
+        }
+      };
+
+      state.inputBus = inputBus;
+      state.worklet = worklet;
+      state.analyser = analyser;
+      state.audioReady = true;
+
+      // Push current master settings
+      syncMasterToWorklet();
+
+      // Instantiate any slots already placed on the board before audio started
+      for (let i = 0; i < state.chain.length; i++) {
+        await pushSlotToWorklet(state.chain[i], i);
+      }
+
+      if (ctx.state !== "running") {
+        try {
+          await ctx.resume();
+        } catch (_) {}
+      }
+      updateAudioStatus();
+    } catch (err) {
+      state.audioInitPromise = null;
+      if (!state.audioReady) {
+        try {
+          ctx.close();
+        } catch (_) {}
+        state.ctx = null;
+      }
+      console.error("Audio init failed:", err);
+      $("audioCtxState").textContent = `Audio Error: ${err?.message || err}`;
+      throw err;
+    }
+  })();
+
+  return state.audioInitPromise;
 }
 
 function updateAudioStatus() {
   const pill = $("audioCtxState");
   if (!state.ctx) {
-    pill.textContent = "Audio: Idle";
-    pill.classList.remove("running");
+    pill.textContent = "Audio: Tap to Start";
+    pill.classList.remove("running", "needs-attention");
     return;
   }
   const sr = state.ctx.sampleRate;
   if (state.ctx.state === "running") {
-    pill.textContent = `Audio: Running @ ${(sr / 1000).toFixed(1)} kHz`;
+    pill.textContent = `Audio: ${(sr / 1000).toFixed(1)} kHz`;
     pill.classList.add("running");
+    pill.classList.remove("needs-attention");
   } else {
-    pill.textContent = `Audio: ${state.ctx.state}`;
+    pill.textContent = `Audio: ${state.ctx.state} (tap to resume)`;
     pill.classList.remove("running");
+    pill.classList.add("needs-attention");
   }
 }
 
@@ -290,6 +374,7 @@ async function addEffectToChain(slug, replaceAll = false, insertIndex = null) {
       ? insertIndex
       : state.chain.length;
   state.chain.splice(idx, 0, slotObj);
+  state.expandedSlotId = slotObj.id;
   renderPedalboard();
 
   if (state.audioReady) {
@@ -317,6 +402,9 @@ function moveSlotToIndex(slotId, insertIndex) {
 
 function removeSlot(slotId) {
   state.chain = state.chain.filter((s) => s.id !== slotId);
+  if (state.expandedSlotId === slotId) {
+    state.expandedSlotId = state.chain[0]?.id ?? null;
+  }
   if (state.worklet) {
     state.worklet.port.postMessage({ type: "removeSlot", slotId });
   }
@@ -341,6 +429,7 @@ function moveSlot(slotId, delta) {
 
 function clearChain() {
   state.chain = [];
+  state.expandedSlotId = null;
   if (state.worklet) {
     state.worklet.port.postMessage({ type: "clearSlots" });
   }
@@ -355,6 +444,10 @@ async function loadPreset(presetKey) {
     if (state.effectsBySlug.has(slug)) {
       await addEffectToChain(slug, false);
     }
+  }
+  if (state.chain.length > 0) {
+    state.expandedSlotId = state.chain[0].id;
+    renderPedalboard();
   }
 }
 
@@ -541,9 +634,22 @@ const ACID_PATTERNS = {
   ],
 };
 
+const DREAMY_PAD_CHORDS = [
+  [48, 55, 58, 62], // Cm9
+  [44, 51, 55, 60], // Abmaj7
+  [41, 48, 51, 55], // Fm9
+  [46, 53, 55, 62], // Bb6/9
+  [48, 55, 60, 63], // Cm (open)
+  [44, 51, 56, 62], // Abmaj9#11
+  [41, 48, 53, 58], // Fm11
+  [43, 50, 53, 60], // G7sus4
+];
+
 let currentAcidPattern = ACID_PATTERNS.acid1.map((s) => ({ ...s }));
+let currentPadChords = DREAMY_PAD_CHORDS.map((c) => [...c]);
 let acidVoice = null; // persistent mono 303 voice { osc, f1, f2, shaper, vca, lastFreq }
 let acidNextStepTime = 0;
+const activePadEnvs = new Set(); // active pad gain envelopes for smooth stop fade-out
 
 function makeSoftClipCurve(amount = 2.2) {
   const n = 256;
@@ -651,6 +757,145 @@ function scheduleAcidStep(freq, when, stepDur, accent, slide) {
   }
 }
 
+function schedulePadNote(freq, when, holdDur = 2.4, peakAmp = 0.14, pan = 0) {
+  const ctx = state.ctx;
+  if (!ctx || !state.inputBus) return;
+
+  const attack = 1.35; // > 1s lush slow swell
+  const release = 2.4; // > 1s velvety tail
+  const releaseStart = when + attack + holdDur;
+  const endTime = releaseStart + release;
+
+  const cutNorm = Number($("acidCutoffSlider")?.value ?? 38) / 100;
+  const resNorm = Number($("acidResSlider")?.value ?? 72) / 100;
+
+  // Base cutoff 180 Hz .. 1800 Hz, Q gently resonant for singing harmonics
+  const baseCut = 180 * Math.pow(10, cutNorm);
+  const peak1 = Math.min(8200, baseCut * 4.4);
+  const midDip = Math.min(4800, baseCut * 2.0);
+  const peak2 = Math.min(7200, baseCut * 3.5);
+  const tailCut = Math.max(95, baseCut * 0.6);
+  const q1 = 1.2 + resNorm * 5.2;
+  const q2 = 0.9 + resNorm * 2.6;
+
+  // Oscillators: detuned saw pair + warm sub-octave triangle
+  const osc1 = ctx.createOscillator();
+  const osc2 = ctx.createOscillator();
+  const oscSub = ctx.createOscillator();
+  osc1.type = "sawtooth";
+  osc2.type = "sawtooth";
+  oscSub.type = "triangle";
+  osc1.frequency.setValueAtTime(freq, when);
+  osc2.frequency.setValueAtTime(freq, when);
+  oscSub.frequency.setValueAtTime(freq * 0.5, when);
+  osc1.detune.setValueAtTime(-7, when);
+  osc2.detune.setValueAtTime(7, when);
+
+  // Subtle slow analog pitch drift LFO
+  const driftLfo = ctx.createOscillator();
+  const driftGain = ctx.createGain();
+  driftLfo.type = "sine";
+  driftLfo.frequency.setValueAtTime(0.24 + Math.random() * 0.14, when);
+  driftGain.gain.setValueAtTime(4.5, when);
+  driftLfo.connect(driftGain);
+  driftGain.connect(osc1.detune);
+  driftGain.connect(osc2.detune);
+
+  const subGain = ctx.createGain();
+  subGain.gain.setValueAtTime(0.32, when);
+
+  // Cascaded dual lowpass with complex 4-stage filter envelope + slow shimmer LFO
+  const f1 = ctx.createBiquadFilter();
+  f1.type = "lowpass";
+  f1.Q.setValueAtTime(q1, when);
+
+  const f2 = ctx.createBiquadFilter();
+  f2.type = "lowpass";
+  f2.Q.setValueAtTime(q2, when);
+
+  // Stage 1: initial slow bloom -> Stage 2: breathing dip -> Stage 3: secondary swell -> Stage 4: dark release
+  const tPeak1 = when + attack * 0.85;
+  const tDip = when + attack + holdDur * 0.42;
+  const tPeak2 = releaseStart;
+
+  f1.frequency.setValueAtTime(baseCut, when);
+  f1.frequency.exponentialRampToValueAtTime(peak1, tPeak1);
+  f1.frequency.exponentialRampToValueAtTime(midDip, tDip);
+  f1.frequency.exponentialRampToValueAtTime(peak2, tPeak2);
+  f1.frequency.exponentialRampToValueAtTime(tailCut, endTime);
+
+  f2.frequency.setValueAtTime(baseCut * 1.25, when);
+  f2.frequency.exponentialRampToValueAtTime(Math.min(9500, peak1 * 1.2), tPeak1 + 0.18);
+  f2.frequency.exponentialRampToValueAtTime(midDip * 1.15, tDip + 0.18);
+  f2.frequency.exponentialRampToValueAtTime(Math.min(9000, peak2 * 1.15), tPeak2);
+  f2.frequency.exponentialRampToValueAtTime(tailCut * 1.1, endTime);
+
+  // Filter shimmer LFO (slow undulation during sustain)
+  const filtLfo = ctx.createOscillator();
+  const filtLfoGain = ctx.createGain();
+  filtLfo.type = "sine";
+  filtLfo.frequency.setValueAtTime(0.38 + Math.random() * 0.2, when);
+  filtLfoGain.gain.setValueAtTime(baseCut * 0.32, when);
+  filtLfo.connect(filtLfoGain);
+  filtLfoGain.connect(f1.frequency);
+
+  // Long >1s attack & >1s release VCA envelope
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(0.0001, when);
+  env.gain.linearRampToValueAtTime(peakAmp, when + attack);
+  env.gain.setValueAtTime(peakAmp * 0.92, releaseStart);
+  env.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+  osc1.connect(f1);
+  osc2.connect(f1);
+  oscSub.connect(subGain);
+  subGain.connect(f1);
+  f1.connect(f2);
+  f2.connect(env);
+
+  if (typeof ctx.createStereoPanner === "function") {
+    const panner = ctx.createStereoPanner();
+    panner.pan.setValueAtTime(pan, when);
+    env.connect(panner);
+    panner.connect(state.inputBus);
+  } else {
+    env.connect(state.inputBus);
+  }
+
+  activePadEnvs.add(env);
+
+  osc1.start(when);
+  osc2.start(when);
+  oscSub.start(when);
+  driftLfo.start(when);
+  filtLfo.start(when);
+
+  const stopAt = endTime + 0.08;
+  osc1.stop(stopAt);
+  osc2.stop(stopAt);
+  oscSub.stop(stopAt);
+  driftLfo.stop(stopAt);
+  filtLfo.stop(stopAt);
+
+  osc1.onended = () => {
+    activePadEnvs.delete(env);
+    try {
+      env.disconnect();
+    } catch (_) {}
+  };
+}
+
+function fadeOutActivePads() {
+  if (!state.ctx) return;
+  const now = state.ctx.currentTime;
+  for (const env of activePadEnvs) {
+    try {
+      env.gain.cancelScheduledValues(now);
+      env.gain.setTargetAtTime(0.0001, now, 0.14);
+    } catch (_) {}
+  }
+}
+
 async function triggerSynthNote(freq, duration = 0.45) {
   await ensureAudio();
   const ctx = state.ctx;
@@ -663,6 +908,11 @@ async function triggerSynthNote(freq, duration = 0.45) {
     return;
   }
 
+  if (voice === "pad") {
+    schedulePadNote(freq, now, Math.max(1.2, duration), 0.24, 0);
+    return;
+  }
+
   const env = ctx.createGain();
   env.connect(state.inputBus);
   const osc1 = ctx.createOscillator();
@@ -670,28 +920,16 @@ async function triggerSynthNote(freq, duration = 0.45) {
   const filt = ctx.createBiquadFilter();
   filt.type = "lowpass";
 
-  if (voice === "pluck") {
-    osc1.type = "sawtooth";
-    osc2.type = "triangle";
-    osc1.frequency.setValueAtTime(freq, now);
-    osc2.frequency.setValueAtTime(freq * 2.002, now);
-    filt.frequency.setValueAtTime(3400, now);
-    filt.frequency.exponentialRampToValueAtTime(380, now + 0.35);
-    env.gain.setValueAtTime(0.001, now);
-    env.gain.linearRampToValueAtTime(0.42, now + 0.006);
-    env.gain.exponentialRampToValueAtTime(0.001, now + duration);
-  } else {
-    // Warm Stereo Pad
-    osc1.type = "sawtooth";
-    osc2.type = "sawtooth";
-    osc1.frequency.setValueAtTime(freq, now);
-    osc2.frequency.setValueAtTime(freq * 1.007, now);
-    filt.frequency.setValueAtTime(1400, now);
-    env.gain.setValueAtTime(0.001, now);
-    env.gain.linearRampToValueAtTime(0.28, now + 0.16);
-    env.gain.exponentialRampToValueAtTime(0.001, now + duration * 1.9);
-    duration *= 1.9;
-  }
+  // Pluck
+  osc1.type = "sawtooth";
+  osc2.type = "triangle";
+  osc1.frequency.setValueAtTime(freq, now);
+  osc2.frequency.setValueAtTime(freq * 2.002, now);
+  filt.frequency.setValueAtTime(3400, now);
+  filt.frequency.exponentialRampToValueAtTime(380, now + 0.35);
+  env.gain.setValueAtTime(0.001, now);
+  env.gain.linearRampToValueAtTime(0.42, now + 0.006);
+  env.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
   osc1.connect(filt);
   osc2.connect(filt);
@@ -703,6 +941,27 @@ async function triggerSynthNote(freq, duration = 0.45) {
 }
 
 function randomizeAcidPattern() {
+  if ($("acidPatternSelect")?.value === "dreamy_pad") {
+    // Generate an 8-chord lush dreamy ambient progression in C minor / Dorian
+    const pool = [
+      [48, 55, 58, 62], // Cm9
+      [44, 51, 55, 60], // Abmaj7
+      [41, 48, 51, 55], // Fm9
+      [46, 53, 55, 62], // Bb6/9
+      [43, 50, 53, 58], // Gm7
+      [44, 51, 56, 62], // Abmaj9#11
+      [39, 46, 50, 55], // Ebmaj7
+      [41, 48, 53, 58], // Fm11
+      [48, 55, 60, 65], // Csus4
+      [43, 50, 53, 60], // G7sus4
+    ];
+    currentPadChords = Array.from({ length: 8 }, (_, i) => {
+      const ch = i === 0 ? pool[0] : pool[Math.floor(Math.random() * pool.length)];
+      return [...ch];
+    });
+    return;
+  }
+
   // Minor / Phrygian acid scale around C2 (MIDI 36)
   const scale = [36, 36, 36, 37, 39, 41, 43, 46, 48, 48, 51];
   currentAcidPattern = Array.from({ length: 16 }, (_, i) => {
@@ -716,6 +975,17 @@ function randomizeAcidPattern() {
   });
 }
 
+function updateSeqButtonLabel() {
+  const btn = $("autoRiffBtn");
+  if (!btn) return;
+  const isPadSeq = $("acidPatternSelect")?.value === "dreamy_pad";
+  if (state.autoRiffTimer) {
+    btn.textContent = isPadSeq ? "■ Stop Pad" : "■ Stop 303";
+  } else {
+    btn.textContent = isPadSeq ? "▶ Pad Loop" : "▶ 303 Loop";
+  }
+}
+
 async function toggleAutoRiff() {
   const btn = $("autoRiffBtn");
   if (state.autoRiffTimer) {
@@ -724,22 +994,45 @@ async function toggleAutoRiff() {
     if (acidVoice && state.ctx) {
       acidVoice.vca.gain.setTargetAtTime(0.0, state.ctx.currentTime, 0.015);
     }
-    btn.textContent = "▶ 303 Loop";
+    fadeOutActivePads();
     btn.classList.remove("btn-toggle", "active");
     btn.classList.add("btn-primary");
+    updateSeqButtonLabel();
     return;
   }
 
   await ensureAudio();
   state.autoRiffStep = 0;
   acidNextStepTime = state.ctx.currentTime + 0.04;
-  btn.textContent = "■ Stop 303";
   btn.classList.remove("btn-primary");
   btn.classList.add("btn-toggle", "active");
 
-  // Lookahead 16th-note scheduler locked to state.bpm
+  // Lookahead scheduler locked to state.bpm (16th-note acid or 2-bar dreamy pad chords)
   state.autoRiffTimer = setInterval(() => {
     if (!state.ctx) return;
+    const isPadSeq = $("acidPatternSelect")?.value === "dreamy_pad";
+    if (isPadSeq) {
+      // Each dreamy chord spans 2 full bars (8 beats), overlapping with >1s attack & release
+      const chordDur = (60.0 / state.bpm) * 8.0;
+      const holdDur = Math.max(1.8, chordDur - 0.8);
+      const pans = [-0.45, -0.15, 0.15, 0.45];
+      while (acidNextStepTime < state.ctx.currentTime + 0.25) {
+        const chord = currentPadChords[state.autoRiffStep % currentPadChords.length];
+        chord.forEach((midi, i) => {
+          schedulePadNote(
+            midiToFreq(midi),
+            acidNextStepTime + i * 0.06,
+            holdDur,
+            0.125,
+            pans[i % pans.length]
+          );
+        });
+        acidNextStepTime += chordDur;
+        state.autoRiffStep++;
+      }
+      return;
+    }
+
     const stepDur = 60.0 / state.bpm / 4.0; // 16th note at current toolbar BPM
     while (acidNextStepTime < state.ctx.currentTime + 0.12) {
       const idx = state.autoRiffStep % currentAcidPattern.length;
@@ -750,6 +1043,8 @@ async function toggleAutoRiff() {
         const voice = $("synthVoiceSelect").value;
         if (voice === "acid_saw" || voice === "acid_sqr") {
           scheduleAcidStep(freq, acidNextStepTime, stepDur, Boolean(step.a), Boolean(prevStep && prevStep.s));
+        } else if (voice === "pad") {
+          schedulePadNote(freq * 2, acidNextStepTime, Math.max(1.2, stepDur * 4), 0.14, 0);
         } else {
           triggerSynthNote(freq * 2, stepDur * 1.6);
         }
@@ -758,6 +1053,8 @@ async function toggleAutoRiff() {
       state.autoRiffStep++;
     }
   }, 25);
+
+  updateSeqButtonLabel();
 }
 
 // ---- Live Mic / Guitar ----
@@ -773,13 +1070,20 @@ async function toggleMicInput() {
       state.micNode = null;
     }
     state.micStream = null;
+    setAudioSessionType("playback");
     btn.textContent = "🎙 Enable Live Input";
     status.textContent = "Stopped";
     status.classList.remove("running");
     return;
   }
 
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    status.textContent = "Live input requires HTTPS & mic support";
+    return;
+  }
+
   try {
+    setAudioSessionType("play-and-record");
     await ensureAudio();
     const deviceId = devSel.value || undefined;
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -813,6 +1117,16 @@ async function toggleMicInput() {
   } catch (err) {
     status.textContent = `Mic error: ${err.message || err}`;
   }
+}
+
+// ---- Mobile Sidebar Drawer ----
+function setSidebarOpen(open) {
+  const sidebar = $("sidebar");
+  const backdrop = $("sidebarBackdrop");
+  if (!sidebar || !backdrop) return;
+  sidebar.classList.toggle("open", open);
+  backdrop.classList.toggle("visible", open);
+  document.body.classList.toggle("drawer-open", open);
 }
 
 // ---- UI Rendering ----
@@ -896,6 +1210,10 @@ function renderSidebarEffects() {
         <span>${(fx.wasmBytes / 1024).toFixed(1)}KB</span>
       </div>
     `;
+    const descEl = document.createElement("div");
+    descEl.className = "effect-desc mobile-only";
+    descEl.textContent = fx.description;
+    meta.appendChild(descEl);
 
     const actions = document.createElement("div");
     actions.className = "effect-actions";
@@ -904,13 +1222,24 @@ function renderSidebarEffects() {
     loadBtn.className = "btn btn-sm btn-primary";
     loadBtn.textContent = "Load";
     loadBtn.title = "Audition this effect alone";
-    loadBtn.onclick = () => addEffectToChain(fx.slug, true);
+    loadBtn.onclick = () => {
+      addEffectToChain(fx.slug, true);
+      if (window.innerWidth <= 860) setSidebarOpen(false);
+    };
 
     const addBtn = document.createElement("button");
     addBtn.className = "btn btn-sm btn-ghost";
     addBtn.textContent = "+ Chain";
     addBtn.title = "Append to signal chain";
-    addBtn.onclick = () => addEffectToChain(fx.slug, false);
+    addBtn.onclick = () => {
+      addEffectToChain(fx.slug, false);
+      if (window.innerWidth <= 860) {
+        addBtn.textContent = "Added ✓";
+        setTimeout(() => {
+          addBtn.textContent = "+ Chain";
+        }, 700);
+      }
+    };
 
     actions.append(loadBtn, addBtn);
     item.append(grip, icon, meta, actions);
@@ -957,11 +1286,6 @@ function createKnobControl(slotObj, param) {
     return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
   }
 
-  const defs = document.createElementNS(svgNS, "defs");
-  defs.innerHTML = `<linearGradient id="knobGrad" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0%" stop-color="#3b475e"/><stop offset="100%" stop-color="#181f2c"/>
-  </linearGradient>`;
-
   const track = document.createElementNS(svgNS, "path");
   track.setAttribute("class", "knob-track");
   track.setAttribute("d", arcPath(startAngle, startAngle + sweep));
@@ -978,7 +1302,7 @@ function createKnobControl(slotObj, param) {
   const pointer = document.createElementNS(svgNS, "line");
   pointer.setAttribute("class", "knob-pointer");
 
-  svg.append(defs, track, arc, cap, pointer);
+  svg.append(track, arc, cap, pointer);
   wrap.appendChild(svg);
 
   function updateVisual(val) {
@@ -999,21 +1323,28 @@ function createKnobControl(slotObj, param) {
 
   updateVisual(slotObj.values.get(param.index));
 
-  // Vertical drag interaction
+  // Vertical drag interaction (mouse + touch) + double-tap to reset
   let dragging = false;
+  let moved = false;
   let startY = 0;
   let startVal = 0;
+  let lastTapTime = 0;
 
   wrap.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
     dragging = true;
+    moved = false;
     startY = e.clientY;
     startVal = slotObj.values.get(param.index);
-    wrap.setPointerCapture(e.pointerId);
+    try {
+      wrap.setPointerCapture(e.pointerId);
+    } catch (_) {}
   });
 
   wrap.addEventListener("pointermove", (e) => {
     if (!dragging) return;
     const dy = startY - e.clientY;
+    if (Math.abs(dy) > 4) moved = true;
     const range = param.max - param.min;
     const sensitivity = e.shiftKey ? 450 : 150;
     const nextVal = Math.round(startVal + (dy / sensitivity) * range);
@@ -1024,9 +1355,23 @@ function createKnobControl(slotObj, param) {
     }
   });
 
-  wrap.addEventListener("pointerup", () => {
+  const endDrag = (e) => {
+    if (!dragging) return;
     dragging = false;
-  });
+    if (e.type === "pointerup" && !moved && e.pointerType === "touch") {
+      const now = performance.now();
+      if (now - lastTapTime < 320) {
+        setSlotParam(slotObj, param, param.default);
+        updateVisual(param.default);
+        lastTapTime = 0;
+      } else {
+        lastTapTime = now;
+      }
+    }
+  };
+  wrap.addEventListener("pointerup", endDrag);
+  wrap.addEventListener("pointercancel", endDrag);
+  wrap.addEventListener("lostpointercapture", endDrag);
 
   wrap.addEventListener(
     "wheel",
@@ -1133,15 +1478,26 @@ function renderPedalboard() {
 
   state.chain.forEach((slotObj, idx) => {
     const fx = slotObj.effect;
+    const isExpanded = state.expandedSlotId === slotObj.id;
     const card = document.createElement("div");
-    card.className = "pedal-card" + (slotObj.bypassed ? " bypassed" : "");
+    card.className =
+      "pedal-card" +
+      (slotObj.bypassed ? " bypassed" : "") +
+      (isExpanded ? " expanded" : " collapsed");
     card.dataset.slotId = String(slotObj.id);
 
-    // Header (draggable handle to reorder chain without interfering with knobs)
+    // Header (draggable on desktop; tap to expand/collapse accordion on mobile)
     const head = document.createElement("div");
     head.className = "pedal-head";
     head.draggable = true;
-    head.title = "Drag to reorder in signal chain";
+    head.title = "Drag to reorder · Tap to expand/collapse";
+    head.setAttribute("aria-expanded", String(isExpanded));
+
+    head.addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      state.expandedSlotId = isExpanded ? null : slotObj.id;
+      renderPedalboard();
+    });
 
     head.addEventListener("dragstart", (e) => {
       if (e.target.closest("button")) {
@@ -1169,13 +1525,48 @@ function renderPedalboard() {
     grip.className = "drag-grip";
     grip.textContent = "⋮⋮";
 
+    const headLedBtn = document.createElement("button");
+    headLedBtn.type = "button";
+    headLedBtn.className = "pedal-head-led mobile-only";
+    headLedBtn.title = "Toggle effect bypass";
+    headLedBtn.setAttribute("aria-label", `Toggle ${fx.display} bypass`);
+    headLedBtn.innerHTML = `<span class="footswitch-led"></span>`;
+    headLedBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setSlotBypass(slotObj, !slotObj.bypassed);
+      card.classList.toggle("bypassed", slotObj.bypassed);
+      const fsw = card.querySelector(".footswitch-btn");
+      if (fsw) {
+        const mom = isSlotMomentary(slotObj);
+        const modeTag = mom ? "HOLD (UNLATCH)" : slotObj.bypassed ? "BYPASSED" : "ENGAGED";
+        fsw.innerHTML = `<span class="footswitch-led"></span> ${modeTag}`;
+      }
+    });
+
+    const headIcon = document.createElement("div");
+    headIcon.className = "pedal-head-icon mobile-only";
+    if (fx.iconUrl) {
+      const hImg = document.createElement("img");
+      hImg.src = fx.iconUrl;
+      hImg.alt = fx.display;
+      hImg.draggable = false;
+      headIcon.appendChild(hImg);
+    } else {
+      headIcon.textContent = fx.badge;
+    }
+
     const titles = document.createElement("div");
     titles.style.minWidth = "0";
     titles.innerHTML = `
       <div class="pedal-name">${fx.display}</div>
       <div class="pedal-zd2">${fx.zd2 || fx.filename + ".ZD2"} · ${fx.dspload}% DSP</div>
     `;
-    titleWrap.append(grip, titles);
+
+    const chevron = document.createElement("span");
+    chevron.className = "pedal-chevron mobile-only";
+    chevron.textContent = isExpanded ? "▾" : "▸";
+
+    titleWrap.append(grip, headLedBtn, headIcon, titles, chevron);
 
     const tools = document.createElement("div");
     tools.className = "pedal-tools";
@@ -1275,8 +1666,12 @@ function renderPedalboard() {
     }
 
     // Footswitch interaction (supports both LATCH and momentary UNLATCH)
-    fswBtn.addEventListener("pointerdown", () => {
+    fswBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
       if (isSlotMomentary(slotObj)) {
+        try {
+          fswBtn.setPointerCapture(e.pointerId);
+        } catch (_) {}
         setSlotBypass(slotObj, false);
         refreshFootswitchUI();
       } else {
@@ -1292,7 +1687,9 @@ function renderPedalboard() {
       }
     };
     fswBtn.addEventListener("pointerup", releaseMomentary);
+    fswBtn.addEventListener("pointercancel", releaseMomentary);
     fswBtn.addEventListener("pointerleave", releaseMomentary);
+    fswBtn.addEventListener("lostpointercapture", releaseMomentary);
 
     refreshFootswitchUI();
     footer.appendChild(fswBtn);
@@ -1381,16 +1778,19 @@ function buildMiniKeyboard() {
   kb.innerHTML = "";
   for (const n of KEYBOARD_NOTES) {
     const b = document.createElement("button");
+    b.type = "button";
     b.className = "key-btn" + (n.black ? " black" : "");
     b.textContent = n.key.toUpperCase();
     b.dataset.key = n.key;
     b.title = `${n.note} (${n.key.toUpperCase()})`;
-    b.addEventListener("pointerdown", () => {
+    b.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
       b.classList.add("pressed");
       triggerSynthNote(n.freq);
     });
     const up = () => b.classList.remove("pressed");
     b.addEventListener("pointerup", up);
+    b.addEventListener("pointercancel", up);
     b.addEventListener("pointerleave", up);
     kb.appendChild(b);
   }
@@ -1486,11 +1886,29 @@ async function init() {
     if (file) loadLocalAudioFile(file);
   });
 
-  // Synth (TB-303 Acid Sequencer)
+  // Synth (TB-303 Acid & Dreamy Pad Sequencer)
   $("autoRiffBtn").addEventListener("click", toggleAutoRiff);
   $("acidPatternSelect").addEventListener("change", (e) => {
-    const p = ACID_PATTERNS[e.target.value];
-    if (p) currentAcidPattern = p.map((s) => ({ ...s }));
+    const val = e.target.value;
+    if (val === "dreamy_pad") {
+      $("synthVoiceSelect").value = "pad";
+      currentPadChords = DREAMY_PAD_CHORDS.map((c) => [...c]);
+      if (acidVoice && state.ctx) {
+        acidVoice.vca.gain.setTargetAtTime(0.0, state.ctx.currentTime, 0.02);
+      }
+    } else {
+      const p = ACID_PATTERNS[val];
+      if (p) currentAcidPattern = p.map((s) => ({ ...s }));
+      if ($("synthVoiceSelect").value === "pad") {
+        $("synthVoiceSelect").value = "acid_saw";
+      }
+      fadeOutActivePads();
+    }
+    if (state.autoRiffTimer && state.ctx) {
+      state.autoRiffStep = 0;
+      acidNextStepTime = state.ctx.currentTime + 0.04;
+    }
+    updateSeqButtonLabel();
   });
   $("acidRandBtn").addEventListener("click", () => {
     randomizeAcidPattern();
@@ -1521,13 +1939,20 @@ async function init() {
     syncMasterToWorklet();
   });
 
-  $("globalBypassBtn").addEventListener("click", () => {
+  const toggleGlobalBypass = () => {
     state.globalBypass = !state.globalBypass;
     const btn = $("globalBypassBtn");
     btn.classList.toggle("bypassed", state.globalBypass);
     btn.innerHTML = `<span class="led"></span> ${state.globalBypass ? "BYPASSED" : "ACTIVE"}`;
+    const mBtn = $("mobileBypassBtn");
+    if (mBtn) {
+      mBtn.classList.toggle("bypassed", state.globalBypass);
+      mBtn.innerHTML = `<span class="led"></span> ${state.globalBypass ? "BYPASS" : "ON"}`;
+    }
     syncMasterToWorklet();
-  });
+  };
+  $("globalBypassBtn").addEventListener("click", toggleGlobalBypass);
+  $("mobileBypassBtn")?.addEventListener("click", toggleGlobalBypass);
 
   $("panicBtn").addEventListener("click", () => {
     if (state.worklet) {
@@ -1630,9 +2055,55 @@ async function init() {
     }
   });
 
+  // Mobile sidebar drawer, collapsible panels & audio status button
+  $("openSidebarBtn")?.addEventListener("click", () => setSidebarOpen(true));
+  $("closeSidebarBtn")?.addEventListener("click", () => setSidebarOpen(false));
+  $("sidebarBackdrop")?.addEventListener("click", () => setSidebarOpen(false));
+
+  $("toggleMasterBtn")?.addEventListener("click", () => {
+    const topbar = document.querySelector(".topbar");
+    const btn = $("toggleMasterBtn");
+    if (!topbar || !btn) return;
+    const isOpen = topbar.classList.toggle("master-open");
+    btn.setAttribute("aria-expanded", String(isOpen));
+    btn.textContent = isOpen ? "Mix ▴" : "Mix ▾";
+    btn.classList.toggle("btn-toggle", isOpen);
+    btn.classList.toggle("active", isOpen);
+  });
+
+  $("toggleSynthExtrasBtn")?.addEventListener("click", () => {
+    const extras = $("synthExtras");
+    const btn = $("toggleSynthExtrasBtn");
+    if (!extras || !btn) return;
+    const isOpen = extras.classList.toggle("open");
+    btn.setAttribute("aria-expanded", String(isOpen));
+    btn.textContent = isOpen ? "Tone ▴" : "Tone ▾";
+    btn.classList.toggle("btn-toggle", isOpen);
+    btn.classList.toggle("active", isOpen);
+  });
+
+  $("audioCtxState")?.addEventListener("click", () => {
+    ensureAudio().catch(() => {});
+  });
+
+  // Automatically resume suspended/interrupted mobile AudioContext on next user gesture
+  document.addEventListener(
+    "pointerdown",
+    () => {
+      if (state.ctx && state.ctx.state !== "running") {
+        unlockAudioContextSync(state.ctx);
+      }
+    },
+    { passive: true }
+  );
+
   // Computer keyboard shortcuts (Space = global bypass, A-K = synth notes when on Synth tab)
   window.addEventListener("keydown", (e) => {
     if (e.repeat) return;
+    if (e.key === "Escape") {
+      setSidebarOpen(false);
+      return;
+    }
     if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
     if (e.code === "Space") {
       e.preventDefault();
