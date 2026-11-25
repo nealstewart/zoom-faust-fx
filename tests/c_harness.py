@@ -36,14 +36,16 @@ SH_STATE_GUARD = 0x57464731
 
 def find_zig_exe() -> Optional[Path]:
     """Locate the Zig binary in `.pixi` or on PATH."""
-    candidates = [
-        ROOT / ".pixi" / "envs" / "default" / "Library" / "bin" / "x86_64-w64-mingw32-zig.exe",
-        ROOT / ".pixi" / "envs" / "default" / "Library" / "bin" / "zig.exe",
-        ROOT / ".pixi" / "envs" / "default" / "bin" / "zig",
-    ]
-    for c in candidates:
-        if c.is_file():
-            return c
+    pixi_roots = [ROOT, ROOT.parent / "stomphacks", ROOT / "vendor" / "stomphacks"]
+    for base in pixi_roots:
+        for rel in (
+            Path(".pixi/envs/default/Library/bin/x86_64-w64-mingw32-zig.exe"),
+            Path(".pixi/envs/default/Library/bin/zig.exe"),
+            Path(".pixi/envs/default/bin/zig"),
+        ):
+            c = base / rel
+            if c.is_file():
+                return c
     w = shutil.which("zig") or shutil.which("x86_64-w64-mingw32-zig")
     return Path(w) if w else None
 

@@ -71,23 +71,19 @@ wet_g    = sqrt(max(0.0, mix_knob));
 // SCSP PACK/UNPACK mantissa resolution:
 // Pack=0 -> bypassed (clean), Pack=50 -> ~1024 levels/octave (11-bit signed mantissa),
 // Pack=100 -> ~24 levels/octave (coarse 6-bit Saturn float-pack shimmer)
-pack_steps = ba.if(pack_knob < 0.01, 0.0, 24.0 + (1.0 - pack_knob) * (1.0 - pack_knob) * 2024.0);
+pack_steps     = ba.if(pack_knob < 0.01, 0.0, 24.0 + (1.0 - pack_knob) * (1.0 - pack_knob) * 2024.0);
+inv_pack_steps = ba.if(pack_steps < 1.0, 0.0, 1.0 / pack_steps);
 
 // Emulate Yamaha SCSP floating-point delay-RAM PACK/UNPACK:
 // Step size is proportional to the coarse envelope magnitude (preserving exact 0 -> 0)
-scsp_pack(x) = ba.if(pack_steps < 1.0, x,
-    ba.if(abs(x) < 1.0e-6, 0.0,
-        floor(x * inv_q + 0.5) * q_step))
+scsp_pack(x) = ba.if(pack_steps < 1.0, x, int(x * inv_q) * q_step)
     with {
-        // Piecewise-octave coarse scale (approximates 2^exp without log2/pow)
-        ax     = abs(x);
-        oct    = ba.if(ax > 0.5, 1.0,
-                 ba.if(ax > 0.25, 0.5,
-                 ba.if(ax > 0.125, 0.25,
-                 ba.if(ax > 0.0625, 0.125,
-                 ba.if(ax > 0.03125, 0.0625, 0.03125)))));
-        q_step = oct / pack_steps;
-        inv_q  = pack_steps / oct;
+        // Piecewise-octave coarse scale (4-tier binary/linear without log2/pow or fdiv)
+        ax      = abs(x);
+        oct     = ba.if(ax > 0.25, ba.if(ax > 0.5, 1.0, 0.5), ba.if(ax > 0.125, 0.25, 0.0625));
+        inv_oct = ba.if(ax > 0.25, ba.if(ax > 0.5, 1.0, 2.0), ba.if(ax > 0.125, 4.0, 16.0));
+        q_step  = oct * inv_pack_steps;
+        inv_q   = pack_steps * inv_oct;
     };
 
 // Gentle SCSP chorus/shimmer LFO modulation for the FDN read taps
@@ -98,8 +94,8 @@ lfo2 = os.osc(0.61) * 5.5;
 // 4 x 4096-sample SDRAM ring buffers (~65 KB) + pre-delay + all-pass diffusers
 scsp_fdn_l_step(w0, w1, inL, inR) = nw0, nw1, outL
     with {
-        t0 = de.fdelay1(4096, max(16.0, dF0 + lfo1), w0);
-        t1 = de.fdelay1(4096, max(16.0, dF2 - lfo1), w1);
+        t0 = de.fdelay1(4096, dF0 + lfo1, w0);
+        t1 = de.fdelay1(4096, dF2 - lfo1, w1);
 
         // 2x2 unitary Hadamard feedback rotation + SCSP PACK/UNPACK quantization
         m0  = t0 + t1;
@@ -113,8 +109,8 @@ scsp_fdn_l_step(w0, w1, inL, inR) = nw0, nw1, outL
 
 scsp_fdn_r_step(w2, w3, inR, inL) = nw2, nw3, outR
     with {
-        t2 = de.fdelay1(4096, max(16.0, dF1 + lfo2), w2);
-        t3 = de.fdelay1(4096, max(16.0, dF3 - lfo2), w3);
+        t2 = de.fdelay1(4096, dF1 + lfo2, w2);
+        t3 = de.fdelay1(4096, dF3 - lfo2, w3);
 
         m2  = t2 + t3;
         m3  = t2 - t3;

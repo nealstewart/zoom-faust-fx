@@ -95,9 +95,9 @@ dry_gain  = sqrt(max(0.0, 1.0 - mix_knob));
 wet_gain  = sqrt(max(0.0, mix_knob));
 
 // ---- 3. PS1 SPU / BBD Repeat Shaper (16-Bit RAM Sat + Optional Lo-Fi Crush) ----
-spu_grit(x) = (1.0 - q_blend) * sat + q_blend * crushed
+spu_grit(x) = sat + q_blend * (crushed - sat)
     with {
-        sat     = zm_sat16(ma.tanh(x * sat_drive) * sat_inv);
+        sat     = zm_sat16(x * sat_drive) * sat_inv;
         crushed = int(sat * 96.0) * 0.010416667;
     };
 
@@ -107,18 +107,20 @@ lfo_b = os.osc(0.61);
 mod_l = (0.65 * lfo_a + 0.35 * lfo_b) * mod_smps;
 mod_r = (-0.65 * lfo_a + 0.35 * lfo_b) * mod_smps;
 
-// ---- 5. Stereo SDRAM Delay & Feedback Tanks (4 x 32,768 floats = 524 KB <= 529 KB cap) ----
-// Each channel tank tracks both L and R coupled feedback wires so ECHO, PING (true L->R->L
-// ping-pong), TAPE (multi-head 0.667*T / 0.5*T), and DARK BBD modes stay phase-locked.
-ps1_dly_l_step(wL, wR, inL, inR) = nwL, nwR, wetL
+// ---- 5. Stereo SDRAM Delay & Feedback Tank (2 x 32,768 floats = 262 KB <= 529 KB cap) ----
+// Single coupled L/R feedback loop so ECHO, PING (true L->R->L ping-pong),
+// TAPE (multi-head 0.667*T / 0.5*T), and DARK BBD modes share one stereo pair of delay lines.
+ps1_dly_step(wL, wR, xL, xR, sL, sR) = nwL, nwR, outL, outR
     with {
-        dL   = aa.clip(16.0, 32700.0, base_smps + mod_l);
-        dR   = aa.clip(16.0, 32700.0, base_smps * r_time_mul + mod_r);
-        dL2  = aa.clip(16.0, 32700.0, base_smps * 0.6667 + mod_l * 0.5);
+        dL   = base_smps + mod_l;
+        dR   = base_smps * r_time_mul + mod_r;
+        dL2  = base_smps * 0.6667 + mod_l * 0.5;
+        dR2  = base_smps * 0.5000 + mod_r * 0.5;
 
         tapL  = de.fdelay3(32768, dL,  wL);
-        tapL2 = de.fdelay3(32768, dL2, wL);
+        tapL2 = de.fdelay1(32768, dL2, wL);
         tapR  = de.fdelay3(32768, dR,  wR);
+        tapR2 = de.fdelay1(32768, dR2, wR);
 
         dampedL = zm_ema(v_iir, zm_allpass1(-0.28, tapL));
         dampedR = zm_ema(v_iir, zm_allpass1( 0.25, tapR));
@@ -126,52 +128,25 @@ ps1_dly_l_step(wL, wR, inL, inR) = nwL, nwR, wetL
         fbL = spu_grit((same_fb_mul * dampedL + cross_fb_mul * dampedR) * fb_gain);
         fbR = spu_grit((same_fb_mul * dampedR + cross_fb_mul * dampedL) * fb_gain);
 
-        injL = ba.if(is_ping > 0.5, 0.707 * (inL + inR), inL);
-        injR = ba.if(is_ping > 0.5, 0.0, inR);
+        injL = ba.if(is_ping > 0.5, 0.707 * (sL + sR), sL);
+        injR = ba.if(is_ping > 0.5, 0.0, sR);
 
         nwL  = zm_sat16(injL + fbL);
         nwR  = zm_sat16(injR + fbR);
 
         wetL = dampedL + head2_gain * tapL2;
-    };
-
-ps1_dly_r_step(wL, wR, inL, inR) = nwL, nwR, wetR
-    with {
-        dL   = aa.clip(16.0, 32700.0, base_smps + mod_l);
-        dR   = aa.clip(16.0, 32700.0, base_smps * r_time_mul + mod_r);
-        dR2  = aa.clip(16.0, 32700.0, base_smps * 0.5000 + mod_r * 0.5);
-
-        tapL  = de.fdelay3(32768, dL,  wL);
-        tapR  = de.fdelay3(32768, dR,  wR);
-        tapR2 = de.fdelay3(32768, dR2, wR);
-
-        dampedL = zm_ema(v_iir, zm_allpass1(-0.28, tapL));
-        dampedR = zm_ema(v_iir, zm_allpass1( 0.25, tapR));
-
-        fbL = spu_grit((same_fb_mul * dampedL + cross_fb_mul * dampedR) * fb_gain);
-        fbR = spu_grit((same_fb_mul * dampedR + cross_fb_mul * dampedL) * fb_gain);
-
-        injL = ba.if(is_ping > 0.5, 0.707 * (inL + inR), inL);
-        injR = ba.if(is_ping > 0.5, 0.0, inR);
-
-        nwL  = zm_sat16(injL + fbL);
-        nwR  = zm_sat16(injR + fbR);
-
         wetR = dampedR + head2_gain * tapR2;
-    };
 
-ps1_tank_l(inL, inR) = (ps1_dly_l_step(inL, inR) ~ (_, _)) : !, !, _;
-ps1_tank_r(inL, inR) = (ps1_dly_r_step(inL, inR) ~ (_, _)) : !, !, _;
+        outL = (xL * dry_gain + wetL * wet_gain) * level_knob;
+        outR = (xR * dry_gain + wetR * wet_gain) * level_knob;
+    };
 
 // ---- 6. Complete Stereo Process ----
 // SPU 22.05 kHz half-rate input conditioning (~8.5 kHz LPF + 65 Hz HPF) on wet send
 spu_in_cond(x) = fi.lowpass(2, 8500.0, fi.highpass(1, 65.0, x));
 
-process(xL, xR) = (xL * dry_gain + wetL * wet_gain) * level_knob,
-                  (xR * dry_gain + wetR * wet_gain) * level_knob
+process(xL, xR) = (ps1_dly_step(xL, xR, sL, sR) ~ (_, _))
     with {
-        sL   = spu_in_cond(xL);
-        sR   = spu_in_cond(xR);
-        wetL = ps1_tank_l(sL, sR);
-        wetR = ps1_tank_r(sL, sR);
+        sL = spu_in_cond(xL);
+        sR = spu_in_cond(xR);
     };

@@ -6,7 +6,7 @@
   "display": "XA DLY",
   "badge": "XA",
   "description": "22.05 kHz half-rate / BBD hybrid stereo echo with 4 modes (Echo, Ping-Pong, Tape, Dark) and beat-synced subdivisions.",
-  "dspload": 30,
+  "dspload": 20.05,
   "kernel": "xadly.c",
   "kernel_section": "text",
   "allow_stack": true,
