@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>FAUST FX — WebAssembly Pedalboard Auditioner</title>
-  <link rel="stylesheet" href="styles.css?v=5" />
+  <link rel="stylesheet" href="styles.css?v=6" />
 </head>
 <body>
   <!-- Shared SVG definitions for rotary knobs -->
@@ -91,10 +91,15 @@
 
     <!-- Audio Source Bar -->
     <section class="source-bar">
-      <div class="source-tabs" role="tablist">
-        <button class="tab-btn active" data-source="synth">Test Synth</button>
-        <button class="tab-btn" data-source="sample">Dry Samples / File</button>
-        <button class="tab-btn" data-source="mic">Live Mic / Guitar</button>
+      <div class="source-bar-top">
+        <div class="source-tabs" role="tablist">
+          <button class="tab-btn active" data-source="synth">Test Synth</button>
+          <button class="tab-btn" data-source="sample">Dry Samples / File</button>
+          <button class="tab-btn" data-source="mic">Live Mic / Guitar</button>
+        </div>
+        <div class="audio-status">
+          <button id="audioCtxState" type="button" class="status-pill status-pill-btn" title="Tap to start or resume audio">Audio: Tap to Start</button>
+        </div>
       </div>
 
       <!-- Sample / File Player -->
@@ -162,10 +167,6 @@
           <option value="">Default Audio Input</option>
         </select>
         <span id="micStatus" class="status-pill">Idle (use headphones to avoid feedback)</span>
-      </div>
-
-      <div class="audio-status">
-        <button id="audioCtxState" type="button" class="status-pill status-pill-btn" title="Tap to start or resume audio">Audio: Tap Play or a Key to Start</button>
       </div>
     </section>
 
