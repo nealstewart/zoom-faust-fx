@@ -6,7 +6,7 @@
   "display": "XA RVB",
   "badge": "XA",
   "description": "22.05 kHz half-rate 16-bit hardware reverb with 5 space presets (Room, Studio, Hall, Space, Pipe) and momentary footswitch.",
-  "dspload": 19.89,
+  "dspload": 32,
   "kernel": "xarvb.c",
   "kernel_section": "text",
   "allow_stack": true,

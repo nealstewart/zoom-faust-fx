@@ -406,6 +406,16 @@ static inline float sh_coshf(float x)
     return 0.5f * (e + sh_rcp_pos(e));
 }
 
+/* Faust 2.88+ C-backend inline integer & power helpers */
+static inline int faust_wrap_add(int a, int b) { return a + b; }
+static inline int faust_wrap_sub(int a, int b) { return a - b; }
+static inline int faust_wrap_mul(int a, int b) { return a * b; }
+static inline int faustmaxi(int a, int b) { return (a > b) ? a : b; }
+static inline int faustmini(int a, int b) { return (a < b) ? a : b; }
+static inline float mydsp_faustpower2_f(float x) { return x * x; }
+static inline float mydsp_faustpower3_f(float x) { return x * x * x; }
+static inline float mydsp_faustpower4_f(float x) { float x2 = x * x; return x2 * x2; }
+
 
 /* Persistent FAUST DSP state mapped directly onto instance[2] (zero stack copy!) */
 typedef struct {
@@ -431,7 +441,7 @@ typedef struct {
     float fRec_smoo_M_77;
     float fRec_smoo_M_79;
     float fSmoo_81;
-    float fSmoo_82;
+    float fSmoo_83;
     uint32_t init_magic;
 } faust_zd2_state_t;
 
@@ -524,7 +534,7 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     float st_fRec_smoo_M_77 = pstate->fRec_smoo_M_77;
     float st_fRec_smoo_M_79 = pstate->fRec_smoo_M_79;
     float st_fSmoo_81 = pstate->fSmoo_81;
-    float st_fSmoo_82 = pstate->fSmoo_82;
+    float st_fSmoo_83 = pstate->fSmoo_83;
     if (!(st_fRec_smoo_M_0 > -1.0e12f && st_fRec_smoo_M_0 < 1.0e12f)) st_fRec_smoo_M_0 = 0.0f;
     if (!(st_fRec_smoo_M_1 > -1.0e12f && st_fRec_smoo_M_1 < 1.0e12f)) st_fRec_smoo_M_1 = 0.0f;
     if (!(st_fRec_smoo_M_3 > -1.0e12f && st_fRec_smoo_M_3 < 1.0e12f)) st_fRec_smoo_M_3 = 0.0f;
@@ -546,7 +556,7 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     if (!(st_fRec_smoo_M_77 > -1.0e12f && st_fRec_smoo_M_77 < 1.0e12f)) st_fRec_smoo_M_77 = 0.0f;
     if (!(st_fRec_smoo_M_79 > -1.0e12f && st_fRec_smoo_M_79 < 1.0e12f)) st_fRec_smoo_M_79 = 0.0f;
     if (!(st_fSmoo_81 > -1.0e12f && st_fSmoo_81 < 1.0e12f)) st_fSmoo_81 = 0.0f;
-    if (!(st_fSmoo_82 > -1.0e12f && st_fSmoo_82 < 1.0e12f)) st_fSmoo_82 = 0.0f;
+    if (!(st_fSmoo_83 > -1.0e12f && st_fSmoo_83 < 1.0e12f)) st_fSmoo_83 = 0.0f;
     float * restrict dline_0 = ((float *)dbaseAddr) + 0u;
     float * restrict dline_1 = ((float *)dbaseAddr) + 4112u;
     float * restrict dline_2 = ((float *)dbaseAddr) + 8224u;
@@ -574,16 +584,16 @@ void SH_AUDIO_FN(void **instance, void **ctx)
         st_fSmoo_22 = fHslider3 * 0.01f;
         st_fSmoo_23 = fHslider1 * 0.01f;
         st_fSmoo_64 = fHslider4 * 0.01f;
-        st_fSmoo_81 = fHslider6;
-        st_fSmoo_82 = fHslider5 * 0.01f;
+        st_fSmoo_81 = fHslider5 * 0.01f;
+        st_fSmoo_83 = fHslider6;
         pstate->init_magic = 0x46535431u;
     } else {
         st_fSmoo_6 += 0.03152f * ((fHslider2) - st_fSmoo_6);
         st_fSmoo_22 += 0.03152f * ((fHslider3 * 0.01f) - st_fSmoo_22);
         st_fSmoo_23 += 0.03152f * ((fHslider1 * 0.01f) - st_fSmoo_23);
         st_fSmoo_64 += 0.03152f * ((fHslider4 * 0.01f) - st_fSmoo_64);
-        st_fSmoo_81 += 0.03152f * ((fHslider6) - st_fSmoo_81);
-        st_fSmoo_82 += 0.03152f * ((fHslider5 * 0.01f) - st_fSmoo_82);
+        st_fSmoo_81 += 0.03152f * ((fHslider5 * 0.01f) - st_fSmoo_81);
+        st_fSmoo_83 += 0.03152f * ((fHslider6) - st_fSmoo_83);
     }
     float k_pred_ms_0 = st_fSmoo_6;
     float k_fn_1 = (44.1f * (k_pred_ms_0));
@@ -668,14 +678,16 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     float k_fn_80 = (((k_mode_sel_3) < 1.5f) ? ((107.0f)) : (k_fn_79));
     float k_fn_81 = (((k_mode_sel_3) < 0.5f) ? ((67.0f)) : (k_fn_80));
     float k_dApf2R_82 = (k_fn_81);
-    float k_level_knob_83 = st_fSmoo_81;
-    float k_mix_knob_84 = st_fSmoo_82;
-    float k_fn_85 = sh_maxf(0.0f, 1.0f - k_mix_knob_84);
-    float k_fn_86 = sh_sqrtf(k_fn_85);
-    float k_rvb_dry_87 = k_fn_86;
-    float k_fn_88 = sh_maxf(0.0f, k_mix_knob_84);
-    float k_fn_89 = sh_sqrtf(k_fn_88);
-    float k_rvb_wet_90 = k_fn_89;
+    float k_mix_knob_83 = st_fSmoo_81;
+    float k_fn_84 = sh_maxf(0.0f, 1.0f - k_mix_knob_83);
+    float k_fn_85 = sh_sqrtf(k_fn_84);
+    float k_rvb_dry_86 = k_fn_85;
+    float k_fn_87 = sh_maxf(0.0f, k_mix_knob_83);
+    float k_fn_88 = sh_sqrtf(k_fn_87);
+    float k_rvb_wet_89 = k_fn_88;
+    float k_level_knob_90 = st_fSmoo_83;
+
+
 
     /* ---- 5. FAUST sample-rate loop (16 frames, stereo in-place) -------- */
 #ifdef __TI_COMPILER_VERSION__
@@ -794,8 +806,10 @@ void SH_AUDIO_FN(void **instance, void **ctx)
         float fWith_process_rec_l_78 = (st_fRec_smoo_M_77);
         st_fRec_smoo_M_79 += (0.64f) * (((fWith_process_ap2R_76)) - st_fRec_smoo_M_79);
         float fWith_process_rec_r_80 = (st_fRec_smoo_M_79);
-        out0 = ((in0) * k_rvb_dry_87 + (fWith_process_rec_l_78) * k_rvb_wet_90 * 1.45f) * k_level_knob_83;
-        out1 = ((in1) * k_rvb_dry_87 + (fWith_process_rec_r_80) * k_rvb_wet_90 * 1.45f) * k_level_knob_83;
+        float fWith_zm_soft_clip_xc_82 = sh_clipf(((in0) * k_rvb_dry_86 + (fWith_process_rec_l_78) * k_rvb_wet_89 * 1.00f), -1.5f, 1.5f);
+        float fWith_zm_soft_clip_xc_84 = sh_clipf(((in1) * k_rvb_dry_86 + (fWith_process_rec_r_80) * k_rvb_wet_89 * 1.00f), -1.5f, 1.5f);
+        out0 = ((fWith_zm_soft_clip_xc_82) - 0.14814815f * (fWith_zm_soft_clip_xc_82) * (fWith_zm_soft_clip_xc_82) * (fWith_zm_soft_clip_xc_82)) * k_level_knob_90;
+        out1 = ((fWith_zm_soft_clip_xc_84) - 0.14814815f * (fWith_zm_soft_clip_xc_84) * (fWith_zm_soft_clip_xc_84) * (fWith_zm_soft_clip_xc_84)) * k_level_knob_90;
 
         /* Firmware bypass crossfade & mandatory (-8, +8) output NaN clamp */
         float outL = dryL + fade * (out0 - dryL);
@@ -831,5 +845,5 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     pstate->fRec_smoo_M_77 = st_fRec_smoo_M_77;
     pstate->fRec_smoo_M_79 = st_fRec_smoo_M_79;
     pstate->fSmoo_81 = st_fSmoo_81;
-    pstate->fSmoo_82 = st_fSmoo_82;
+    pstate->fSmoo_83 = st_fSmoo_83;
 }

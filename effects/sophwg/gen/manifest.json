@@ -6,7 +6,7 @@
   "display": "SOPH WG",
   "badge": "SW",
   "description": "SOPHIE-style 4-point morphing Karplus-Strong + comb + triggered pitch-envelope vocal synthesizer (Rubber, Bubble, Squeaky Plastic, Inharmonic Metal).",
-  "dspload": 21.19,
+  "dspload": 32,
   "kernel": "sophwg.c",
   "kernel_section": "text",
   "allow_stack": true,
@@ -49,6 +49,13 @@
       "max": 100,
       "default": 95,
       "explanation": "Dry vocal vs. wet blend (0..100%)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Master output level (80 is unity at nominal MS-70CDR+ bus level).",
+      "curve": "stock_vol"
     }
   ]
 }

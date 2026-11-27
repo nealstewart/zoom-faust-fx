@@ -86,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
                 "report_passed": result.report_passed,
                 "report_summary": result.report_summary,
                 "dspload": result.dspload,
+                "gain_staging": result.gain_staging.to_dict() if result.gain_staging else None,
             }, indent=2))
         return 0 if result.report_passed else 1
 
@@ -117,11 +118,37 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps([r.to_dict() for r in results], indent=2))
         elif results and len(results) == 1:
             r = results[0]
+            gs_part = ""
+            if r.gain_staging is not None:
+                g = r.gain_staging
+                note_part = f" ({', '.join(g.notes)})" if g.notes else ""
+                gs_part = (
+                    f" | gain={g.gain_db:+.1f} dB pk={g.peak_out:.2f} "
+                    f"hot_pk={g.hot_peak_out:.2f} dc={g.dc_offset:.4f} "
+                    f"byp={g.bypass_gain_db:+.2f} dB [{g.status}]{note_part}"
+                )
             print(
                 f"Summary: {r.name} | {r.loop_type} | VLIW={r.vliw_cycles} cyc | "
                 f"EstTotal={r.total_estimated_cycles} cyc | dspload={r.dspload_estimate:.2f} ({r.dspload_pct:.1f}%)"
                 + (f" | host={r.host_ns_per_block:.1f} ns/blk" if r.host_ns_per_block is not None else "")
+                + gs_part
             )
+        elif results and len(results) > 1:
+            gs_rows = [r for r in results if r.gain_staging is not None]
+            if gs_rows:
+                print("\nGain Staging Summary (0.24 RMS / -12.4 dBFS guitar bus, default knobs):")
+                print(
+                    f"  {'Effect':<12} {'Gain(dB)':>8} {'PkOut':>6} {'HotPk':>6} "
+                    f"{'Clip%':>6} {'DC':>7} {'L/R(dB)':>8} {'Byp(dB)':>8} {'Status':<6} Notes"
+                )
+                for r in gs_rows:
+                    g = r.gain_staging
+                    assert g is not None
+                    print(
+                        f"  {r.name:<12} {g.gain_db:+8.2f} {g.peak_out:6.3f} {g.hot_peak_out:6.3f} "
+                        f"{g.dac_clip_pct:6.2f} {g.dc_offset:7.4f} {g.lr_balance_db:+8.2f} "
+                        f"{g.bypass_gain_db:+8.2f} {g.status:<6} {', '.join(g.notes)}"
+                    )
         return 0
 
     if args.command == "install":

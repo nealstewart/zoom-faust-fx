@@ -35,13 +35,14 @@ declare zd2_dspload "32";
 import("stdfaust.lib");
 import("zoom.lib");
 
-// ---- 6 Pedal Knobs (Mapped to Zoom MS-70CDR+ Parameter Pages) ----
+// ---- 7 Pedal Knobs (Mapped to Zoom MS-70CDR+ Parameter Pages) ----
 material   = hslider("Matrl[1][tooltip:4-point material morph (0 = Rubber, 33 = Bubble, 67 = Squeaky Plastic, 100 = Metal).]", 33, 0, 100, 1) * 0.01 : si.smoo;
 pitch_tune = hslider("Pitch[2][tooltip:Base Karplus-Strong pitch (-24..+24 semitones).]", 0, -24, 24, 1) : si.smoo;
 pitch_env  = hslider("P.Env[3][tooltip:Onset-triggered pitch envelope sweep depth (-100..+100%).]", 88, -100, 100, 1) * 0.01 : si.smoo;
 decay      = hslider("Decay[4][tooltip:Karplus-Strong feedback decay scaling (0..100%).]", 55, 0, 100, 1) * 0.01 : si.smoo;
 bite_disp  = hslider("Bite[5][tooltip:Comb filter depth and transient bite (0..100%).]", 80, 0, 100, 1) * 0.01 : si.smoo;
 mix        = hslider("Mix[6][tooltip:Dry vocal vs. wet blend (0..100%).]", 95, 0, 100, 1) * 0.01 : si.smoo;
+level_knob = hslider("Level[7][curve:stock_vol][tooltip:Master output level (80 is unity at nominal MS-70CDR+ bus level).]", 80, 0, 100, 1) : si.smoo;
 
 // ---- 4-Point Partition-of-Unity Triangular Weights (0.00, 0.333, 0.667, 1.00) ----
 m3    = material * 3.0;
@@ -85,7 +86,7 @@ crash_gain = (0.35 * w_rub + 0.00 * w_bub + 0.45 * w_pls + 3.20 * w_met) * (0.4 
 body_gain  = 2.60 * w_rub + 2.40 * w_bub + 2.20 * w_pls + 0.90 * w_met;
 
 dry_gain = 1.0 - mix;
-wet_gain = mix * 1.35;
+wet_gain = mix * 0.50;
 
 // ---- 1. Onset Detector & Triggered Pitch-Envelope Generator (`~ _`) ----
 vox_hpf(x)  = fi.highpass(2, 95.0, x);
@@ -147,6 +148,6 @@ process(xL, xR) = out_l, out_r
         wet_l  = de.fdelay3(1024, d_smps, loop_s);
         wet_r  = de.fdelay3(1024, min(1018.0, d_smps * (1.0 + 0.012 * w_met) + 4.0), loop_s);
 
-        out_l  = xL * dry_gain + wet_l * wet_gain;
-        out_r  = xL * dry_gain + wet_r * wet_gain;
+        out_l  = (xL * dry_gain + wet_l * wet_gain) * level_knob;
+        out_r  = (xL * dry_gain + wet_r * wet_gain) * level_knob;
     };

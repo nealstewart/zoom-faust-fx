@@ -28,6 +28,7 @@ class BuildResult:
     report_summary: str
     dspload: float | None = None
     audio_dis_path: Path | None = None
+    gain_staging: benchmark.GainStagingMetrics | None = None
 
 
 @dataclass(slots=True)
@@ -172,15 +173,36 @@ def build_steps(
 
     # 6. benchmark
     dspload_val: float | None = manifest_data.get("dspload")
+    gain_staging: benchmark.GainStagingMetrics | None = None
     if run_benchmark and audio_dis.is_file():
-        yield BuildEvent("benchmark", "running", f"Analyzing C674x VLIW & memory hierarchy ({audio_dis.name})")
+        yield BuildEvent("benchmark", "running", f"Analyzing C674x VLIW, memory hierarchy & gain staging ({audio_dis.name})")
         metrics = benchmark.analyze_dis_file(audio_dis, eff_name=manifest_data.get("name", fname))
         dspload_val = metrics.dspload_estimate
+        kernel_name = manifest_data.get("kernel", "")
+        if kernel_name:
+            for cand in (manifest_path.parent / kernel_name, work_dir / kernel_name):
+                if cand.is_file():
+                    gain_staging = benchmark.try_gain_staging(cand, manifest_data)
+                    break
+        gs_part = ""
+        if gain_staging is not None:
+            gs_part = (
+                f", gain={gain_staging.gain_db:+.1f} dB "
+                f"pk={gain_staging.peak_out:.2f} hot_pk={gain_staging.hot_peak_out:.2f} "
+                f"[{gain_staging.status}]"
+            )
         yield BuildEvent(
             "benchmark",
             "completed",
-            f"{metrics.loop_type}: {metrics.vliw_cycles} VLIW cyc, dspload={dspload_val:.2f} ({metrics.dspload_pct:.1f}%)",
+            f"{metrics.loop_type}: {metrics.vliw_cycles} VLIW cyc, dspload={dspload_val:.2f} ({metrics.dspload_pct:.1f}%){gs_part}",
         )
+        if gain_staging is not None and gain_staging.status != "OK":
+            notes_str = ", ".join(gain_staging.notes) if gain_staging.notes else gain_staging.status
+            yield BuildEvent(
+                "benchmark",
+                "warning",
+                f"Gain staging {gain_staging.status}: {notes_str}",
+            )
         # Populate dspload into manifest.json and re-pack so .ZD2 INFO.dspload & REPORT.md match
         if manifest_data.get("dspload") != dspload_val:
             manifest_data["dspload"] = dspload_val
@@ -225,6 +247,7 @@ def build_steps(
         report_summary=chk.summary,
         dspload=dspload_val,
         audio_dis_path=final_dis if final_dis.is_file() else None,
+        gain_staging=gain_staging,
     )
     yield BuildEvent(
         "verify",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import json
+import math
 import os
 import re
 import struct
@@ -25,8 +26,32 @@ CYCLES_PER_RAW_UNIT = 240.0  # ~64,800 cycles == 270.0 raw (calibrated against s
 
 
 @dataclass(slots=True)
+class GainStagingMetrics:
+    """Empirical gain-staging measurements on a pedal-calibrated guitar bus (0.24 RMS)."""
+
+    input_rms_dbfs: float
+    output_rms_dbfs: float
+    gain_db: float
+    peak_in: float
+    peak_out: float
+    peak_out_dbfs: float
+    hot_peak_out: float
+    dac_clip_pct: float
+    hot_dac_clip_pct: float
+    clamp_hits: int
+    dc_offset: float
+    lr_balance_db: float
+    bypass_gain_db: float
+    status: str
+    notes: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass(slots=True)
 class BenchmarkMetrics:
-    """C674x VLIW, memory-hierarchy, and optional host timing metrics for an effect."""
+    """C674x VLIW, memory-hierarchy, host timing, and gain-staging metrics for an effect."""
 
     name: str
     loop_type: str
@@ -44,6 +69,7 @@ class BenchmarkMetrics:
     dspload_estimate: float
     dspload_pct: float
     host_ns_per_block: float | None = None
+    gain_staging: GainStagingMetrics | None = None
     uses_sdram: bool = False
     dis_path: str | None = None
 
@@ -408,6 +434,291 @@ def try_host_timing(c_path: Path, manifest: dict, n_blocks: int = 50000) -> floa
         return None
 
 
+_GAIN_PROBE_SR = 44100.0
+_GAIN_PROBE_RMS_TARGET = 0.24  # Pedal guitar bus nominal RMS (~ -12.4 dBFS; docs/building-effects.md)
+_GAIN_PROBE_CACHE: tuple[list[float], list[float], float, float, float] | None = None
+
+
+def _get_guitar_probe_buffers() -> tuple[list[float], list[float], float, float, float]:
+    """Return cached (nominal_buf, hot_buf, nom_rms, nom_peak, hot_rms) of length 44100.
+
+    Uses deterministic band-limited pink-ish noise (100 Hz..4.5 kHz, guitar crest factor
+    ~0.24 RMS / ~0.70 peak) so comb filters, reverbs, and resonant filters are measured
+    across a broadband musical spectrum without harmonic comb-resonance bias.
+    """
+    global _GAIN_PROBE_CACHE
+    if _GAIN_PROBE_CACHE is not None:
+        return _GAIN_PROBE_CACHE
+
+    n = int(_GAIN_PROBE_SR)
+    # Deterministic LCG -> Paul Kellet pink filter -> 100 Hz HPF + 4.5 kHz LPF
+    state = 0x12345678
+    b0 = b1 = b2 = 0.0
+    hp_y = hp_x_prev = 0.0
+    lp_y = 0.0
+    hp_a = 0.9858  # ~100 Hz 1-pole HPF @ 44.1 kHz
+    lp_a = 0.45    # ~4.5 kHz 1-pole LPF @ 44.1 kHz
+
+    raw = [0.0] * n
+    # Warm up filters for 512 samples
+    for idx in range(n + 512):
+        state = (1664525 * state + 1013904223) & 0xFFFFFFFF
+        w = (state / 2147483648.0) - 1.0
+        b0 = 0.99765 * b0 + w * 0.0990460
+        b1 = 0.96300 * b1 + w * 0.2965164
+        b2 = 0.57000 * b2 + w * 1.0526913
+        pink = b0 + b1 + b2 + w * 0.1848
+        hp_y = hp_a * (hp_y + pink - hp_x_prev)
+        hp_x_prev = pink
+        lp_y += lp_a * (hp_y - lp_y)
+        if idx >= 512:
+            raw[idx - 512] = lp_y
+
+    # Remove residual mean and soft-limit extreme noise outliers to realistic guitar crest (~2.9x)
+    mean_v = sum(raw) / n
+    raw = [x - mean_v for x in raw]
+    rms0 = math.sqrt(sum(x * x for x in raw) / n)
+    raw = [math.tanh(x / (3.0 * rms0)) for x in raw]
+
+    raw_rms = math.sqrt(sum(x * x for x in raw) / n)
+    raw_peak = max(abs(x) for x in raw)
+
+    nom_scale = _GAIN_PROBE_RMS_TARGET / raw_rms
+    nom_buf = [x * nom_scale for x in raw]
+    nom_rms = _GAIN_PROBE_RMS_TARGET
+    nom_peak = raw_peak * nom_scale
+
+    hot_scale = 1.0 / raw_peak
+    hot_buf = [x * hot_scale for x in raw]
+    hot_rms = raw_rms * hot_scale
+
+    _GAIN_PROBE_CACHE = (nom_buf, hot_buf, nom_rms, nom_peak, hot_rms)
+    return _GAIN_PROBE_CACHE
+
+
+def _lin_to_dbfs(val: float) -> float:
+    if val <= 1e-12:
+        return -120.0
+    return 20.0 * math.log10(val)
+
+
+def try_gain_staging(c_path: Path, manifest: dict) -> GainStagingMetrics | None:
+    """Measure gain staging on a pedal-calibrated guitar bus via tests/c_harness.py."""
+    try:
+        repo_root = Path(__file__).resolve().parent.parent
+        if str(repo_root) not in sys.path:
+            sys.path.insert(0, str(repo_root))
+        from tests.c_harness import KernelHarness
+    except Exception:
+        return None
+
+    try:
+        c_src = c_path.read_text(encoding="utf-8-sig", errors="replace")
+        sym = re.sub(r"[^A-Za-z0-9]", "", manifest["name"])
+        fn_name = f"Fx_SFX_{sym}"
+        export_attr = "__declspec(dllexport) " if sys.platform == "win32" else ""
+        probe_c_addon = f"""
+{export_attr}void run_gain_probe(
+    void **instance,
+    void **ctx,
+    const float *in_buf,
+    int buf_len,
+    int warmup_blocks,
+    int measure_blocks,
+    double *stats
+) {{
+    float *eff = (float *)ctx[1];
+    int total = warmup_blocks + measure_blocks;
+    int pos = 0;
+    double sum_sq_l = 0.0, sum_sq_r = 0.0, sum_sq_in = 0.0;
+    double sum_l = 0.0, sum_r = 0.0;
+    double peak_l = 0.0, peak_r = 0.0;
+    double dac_clips = 0.0, clamp_hits = 0.0;
+
+    for (int b = 0; b < total; b++) {{
+        for (int i = 0; i < 16; i++) {{
+            float s = in_buf[pos];
+            pos++;
+            if (pos >= buf_len) pos = 0;
+            eff[i] = s;
+            eff[i + 16] = s;
+            if (b >= warmup_blocks) {{
+                sum_sq_in += (double)s * (double)s;
+            }}
+        }}
+        {fn_name}(instance, ctx);
+        if (b >= warmup_blocks) {{
+            for (int i = 0; i < 16; i++) {{
+                float xl = eff[i];
+                float xr = eff[i + 16];
+                if (!(xl == xl) || !(xl > -7.99f && xl < 7.99f)) {{
+                    clamp_hits += 1.0;
+                }} else {{
+                    double al = xl < 0.0f ? -(double)xl : (double)xl;
+                    if (al > peak_l) peak_l = al;
+                    if (al > 1.0) dac_clips += 1.0;
+                    sum_sq_l += (double)xl * (double)xl;
+                    sum_l += (double)xl;
+                }}
+                if (!(xr == xr) || !(xr > -7.99f && xr < 7.99f)) {{
+                    clamp_hits += 1.0;
+                }} else {{
+                    double ar = xr < 0.0f ? -(double)xr : (double)xr;
+                    if (ar > peak_r) peak_r = ar;
+                    if (ar > 1.0) dac_clips += 1.0;
+                    sum_sq_r += (double)xr * (double)xr;
+                    sum_r += (double)xr;
+                }}
+            }}
+        }}
+    }}
+    stats[0] = sum_sq_l;
+    stats[1] = sum_sq_r;
+    stats[2] = sum_l;
+    stats[3] = sum_r;
+    stats[4] = peak_l;
+    stats[5] = peak_r;
+    stats[6] = dac_clips;
+    stats[7] = clamp_hits;
+    stats[8] = sum_sq_in;
+}}
+"""
+        nom_buf, hot_buf, nom_rms, nom_peak, _hot_rms = _get_guitar_probe_buffers()
+        buf_len = len(nom_buf)
+        nom_arr = (ctypes.c_float * buf_len)(*nom_buf)
+        hot_arr = (ctypes.c_float * buf_len)(*hot_buf)
+        stats = (ctypes.c_double * 9)()
+
+        with KernelHarness(c_src + probe_c_addon, manifest) as h:
+            aux_buf = (ctypes.c_float * 32)()
+            h.ctx[2] = ctypes.cast(aux_buf, ctypes.c_void_p)
+            probe_fn = h.lib.run_gain_probe
+            probe_fn.argtypes = [
+                ctypes.POINTER(ctypes.c_void_p),
+                ctypes.POINTER(ctypes.c_void_p),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.POINTER(ctypes.c_double),
+            ]
+            probe_fn.restype = None
+
+            is_unlatch_default = any(
+                p.get("footswitch_toggle") and p.get("default", 0) == 1
+                for p in manifest.get("params", [])
+            )
+
+            # 1. Nominal guitar-level active pass (0.5 s warmup + 0.5 s measure)
+            h.reset()
+            h.ctx[2] = ctypes.cast(aux_buf, ctypes.c_void_p)
+            if is_unlatch_default:
+                # Pre-roll 0.35 s bypassed so momentary retro-capture buffers fill with audio
+                h.set_bypass_fade(0.0)
+                probe_fn(h.instance, h.ctx, nom_arr, buf_len, 965, 0, stats)
+                h.set_bypass_fade(1.0)
+            nom_warm, nom_meas = 1378, 1378
+            probe_fn(h.instance, h.ctx, nom_arr, buf_len, nom_warm, nom_meas, stats)
+            n_frames = nom_meas * 16
+            in_rms_nom = math.sqrt(stats[8] / n_frames)
+            rms_l = math.sqrt(stats[0] / n_frames)
+            rms_r = math.sqrt(stats[1] / n_frames)
+            out_rms = math.sqrt(0.5 * (rms_l * rms_l + rms_r * rms_r))
+            dc_offset = max(abs(stats[2] / n_frames), abs(stats[3] / n_frames))
+            peak_out = max(stats[4], stats[5])
+            nom_dac_clip_pct = 100.0 * stats[6] / (2.0 * n_frames)
+            clamp_hits = int(stats[7])
+
+            # 2. Hot-input pass (1.0 peak, 0.2 s warmup + 0.2 s measure)
+            h.reset()
+            h.ctx[2] = ctypes.cast(aux_buf, ctypes.c_void_p)
+            if is_unlatch_default:
+                h.set_bypass_fade(0.0)
+                probe_fn(h.instance, h.ctx, hot_arr, buf_len, 965, 0, stats)
+                h.set_bypass_fade(1.0)
+            hot_warm, hot_meas = 551, 551
+            probe_fn(h.instance, h.ctx, hot_arr, buf_len, hot_warm, hot_meas, stats)
+            hot_frames = hot_meas * 16
+            hot_peak_out = max(stats[4], stats[5])
+            hot_dac_clip_pct = 100.0 * stats[6] / (2.0 * hot_frames)
+            clamp_hits += int(stats[7])
+
+            # 3. Bypass unity check (fade = 0.0, 0.1 s warmup + 0.1 s measure)
+            h.reset()
+            h.ctx[2] = ctypes.cast(aux_buf, ctypes.c_void_p)
+            h.set_bypass_fade(0.0)
+            byp_warm, byp_meas = 275, 275
+            probe_fn(h.instance, h.ctx, nom_arr, buf_len, byp_warm, byp_meas, stats)
+            byp_frames = byp_meas * 16
+            in_rms_byp = math.sqrt(stats[8] / byp_frames)
+            byp_rms = math.sqrt(0.5 * (stats[0] + stats[1]) / byp_frames)
+
+        in_dbfs = _lin_to_dbfs(in_rms_nom)
+        out_dbfs = _lin_to_dbfs(out_rms)
+        gain_db = out_dbfs - in_dbfs
+        peak_out_dbfs = _lin_to_dbfs(peak_out)
+        byp_gain_db = _lin_to_dbfs(byp_rms) - _lin_to_dbfs(in_rms_byp)
+
+        if rms_l <= 1e-9 and rms_r <= 1e-9:
+            lr_balance_db = 0.0
+        elif rms_r <= 1e-9:
+            lr_balance_db = 60.0
+        elif rms_l <= 1e-9:
+            lr_balance_db = -60.0
+        else:
+            lr_balance_db = max(-60.0, min(60.0, 20.0 * math.log10(rms_l / rms_r)))
+
+        notes: list[str] = []
+        status = "OK"
+        if clamp_hits > 0:
+            status = "CLIP"
+            notes.append(f"clamp/NaN hits={clamp_hits}")
+        if nom_dac_clip_pct > 1.0:
+            if status == "OK":
+                status = "CLIP"
+            notes.append(f"DAC>1.0: {nom_dac_clip_pct:.1f}%")
+        if gain_db > 3.0:
+            if status == "OK":
+                status = "HOT"
+            notes.append(f"{gain_db:+.1f} dB hot")
+        elif gain_db < -3.0:
+            if status == "OK":
+                status = "QUIET"
+            notes.append(f"{gain_db:+.1f} dB quiet")
+        if abs(byp_gain_db) > 0.25:
+            if status == "OK":
+                status = "WARN"
+            notes.append(f"bypass={byp_gain_db:+.1f} dB")
+        if dc_offset > 0.02:
+            if status == "OK":
+                status = "WARN"
+            notes.append(f"DC={dc_offset:.3f}")
+        if abs(lr_balance_db) > 2.0:
+            if status == "OK":
+                status = "WARN"
+            notes.append(f"L/R={lr_balance_db:+.1f} dB")
+
+        return GainStagingMetrics(
+            input_rms_dbfs=round(in_dbfs, 2),
+            output_rms_dbfs=round(out_dbfs, 2),
+            gain_db=round(gain_db, 2),
+            peak_in=round(nom_peak, 3),
+            peak_out=round(peak_out, 3),
+            peak_out_dbfs=round(peak_out_dbfs, 2),
+            hot_peak_out=round(hot_peak_out, 3),
+            dac_clip_pct=round(nom_dac_clip_pct, 2),
+            hot_dac_clip_pct=round(hot_dac_clip_pct, 2),
+            clamp_hits=clamp_hits,
+            dc_offset=round(dc_offset, 4),
+            lr_balance_db=round(lr_balance_db, 2),
+            bypass_gain_db=round(byp_gain_db, 2),
+            status=status,
+            notes=notes,
+        )
+    except Exception:
+        return None
+
+
 def _analyze_single_target(target: Path, stomphacks_dir: Path) -> BenchmarkMetrics:
     if target.is_file() and target.name.endswith(".dis"):
         return analyze_dis_file(target, eff_name=target.stem.split(".")[0], strict=False)
@@ -421,6 +732,7 @@ def _analyze_single_target(target: Path, stomphacks_dir: Path) -> BenchmarkMetri
             dis_path = compile_c_to_dis(c_path, out.manifest, stomphacks_dir, tmp_p)
             metrics = analyze_dis_file(dis_path, eff_name=out.meta.name)
             metrics.host_ns_per_block = try_host_timing(c_path, out.manifest)
+            metrics.gain_staging = try_gain_staging(c_path, out.manifest)
             return metrics
 
     if target.is_dir():
@@ -429,7 +741,7 @@ def _analyze_single_target(target: Path, stomphacks_dir: Path) -> BenchmarkMetri
             dis_list = sorted(bdir.glob("*.audio.dis")) if bdir.is_dir() else []
             if dis_list:
                 metrics = analyze_dis_file(dis_list[0], eff_name=target.name, strict=False)
-                # Optionally attach host timing if C source exists
+                # Optionally attach host timing & gain staging if C source exists
                 for src_dir in (target / "gen", target):
                     mpath = src_dir / "manifest.json"
                     if mpath.is_file():
@@ -437,6 +749,7 @@ def _analyze_single_target(target: Path, stomphacks_dir: Path) -> BenchmarkMetri
                         cpath = src_dir / m.get("kernel", f"{target.name}.c")
                         if cpath.is_file():
                             metrics.host_ns_per_block = try_host_timing(cpath, m)
+                            metrics.gain_staging = try_gain_staging(cpath, m)
                         break
                 return metrics
 
@@ -451,6 +764,7 @@ def _analyze_single_target(target: Path, stomphacks_dir: Path) -> BenchmarkMetri
                         dis_path = compile_c_to_dis(cpath, m, stomphacks_dir, Path(tmp))
                         metrics = analyze_dis_file(dis_path, eff_name=m.get("name", target.name))
                         metrics.host_ns_per_block = try_host_timing(cpath, m)
+                        metrics.gain_staging = try_gain_staging(cpath, m)
                         return metrics
 
         dsp_files = sorted(target.glob("*.dsp"))
@@ -490,10 +804,17 @@ def analyze_steps(
             try:
                 m = _analyze_single_target(sub, sh_dir)
                 results.append(m)
+                gs_str = ""
+                if m.gain_staging is not None:
+                    g = m.gain_staging
+                    gs_str = f", gain={g.gain_db:+.1f}dB pk={g.peak_out:.2f} [{g.status}]"
                 yield BenchmarkEvent(
                     stage="benchmark",
                     status="progress",
-                    message=f"{sub.name}: {m.vliw_cycles} VLIW cyc, dspload~{m.dspload_estimate:.1f} ({m.dspload_pct:.1f}%)",
+                    message=(
+                        f"{sub.name}: {m.vliw_cycles} VLIW cyc, "
+                        f"dspload~{m.dspload_estimate:.1f} ({m.dspload_pct:.1f}%){gs_str}"
+                    ),
                     metrics=m,
                 )
             except Exception as exc:

@@ -116,8 +116,8 @@ spu_tank_l(lin, rin) = (spu_comb_l_step(lin, rin) ~ (_, _)) : !, !, _;
 spu_tank_r(rin, lin) = (spu_comb_r_step(rin, lin) ~ (_, _)) : !, !, _;
 
 process(xL, xR) =
-    (xL * rvb_dry + rec_l * rvb_wet * 1.45) * level_knob,
-    (xR * rvb_dry + rec_r * rvb_wet * 1.45) * level_knob
+    zm_soft_clip(xL * rvb_dry + rec_l * rvb_wet * 1.00) * level_knob,
+    zm_soft_clip(xR * rvb_dry + rec_r * rvb_wet * 1.00) * level_knob
     with {
         lin_f = zm_ema(0.62, zm_ema(0.62, xL)) * 0.85;
         rin_f = zm_ema(0.62, zm_ema(0.62, xR)) * 0.85;

@@ -103,6 +103,39 @@ Fx_SFX_Delay:
             self.assertTrue(m.uses_sdram)
             self.assertGreater(m.sdram_stall_cycles, 0)
 
+    def test_gain_staging_probe(self) -> None:
+        manifest = {
+            "name": "UnityProbe",
+            "state_bytes": 16,
+            "params": [
+                {"name": "Level", "max": 100, "default": 80, "curve": "stock_vol"}
+            ],
+        }
+        kernel_c = """
+#include <stdint.h>
+#include "sh_params.h"
+void SH_AUDIO_FN(void **instance, void **ctx) {
+    const float *coef = (const float *)instance[1];
+    float *eff = (float *)ctx[1];
+    float fade = coef[SH_COEFF_BYPASS];
+    float lvl = coef[SH_PARAM_LEVEL];
+    float g = 1.0f + fade * (lvl - 1.0f);
+    for (int i = 0; i < SH_FRAMES; i++) {
+        eff[i] *= g;
+        eff[i + SH_CH_B_OFFSET] *= g;
+    }
+}
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            c_p = Path(tmp) / "unity.c"
+            c_p.write_text(kernel_c, encoding="utf-8")
+            gs = benchmark.try_gain_staging(c_p, manifest)
+            if gs is not None:
+                self.assertAlmostEqual(gs.gain_db, 0.0, delta=0.1)
+                self.assertAlmostEqual(gs.bypass_gain_db, 0.0, delta=0.1)
+                self.assertEqual(gs.clamp_hits, 0)
+                self.assertEqual(gs.status, "OK")
+
 
 class TestCLISmoke(unittest.TestCase):
     def test_cli_help(self) -> None:
