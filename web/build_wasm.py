@@ -49,6 +49,9 @@ def find_zig_exe() -> Path:
         ROOT / ".pixi" / "envs" / "default" / "Library" / "bin" / "x86_64-w64-mingw32-zig.exe",
         ROOT / ".pixi" / "envs" / "default" / "Library" / "bin" / "zig.exe",
         ROOT / ".pixi" / "envs" / "default" / "bin" / "zig",
+        ROOT.parent / "stomphacks" / ".pixi" / "envs" / "default" / "Library" / "bin" / "x86_64-w64-mingw32-zig.exe",
+        ROOT.parent / "stomphacks" / ".pixi" / "envs" / "default" / "Library" / "bin" / "zig.exe",
+        ROOT.parent / "stomphacks" / ".pixi" / "envs" / "default" / "bin" / "zig",
     ]
     for c in candidates:
         if c.is_file():
@@ -74,6 +77,7 @@ def synthesize_sh_params_h(manifest: dict) -> tuple[str, list[dict]]:
     guard_word = state_bytes // 4
 
     param_defines = []
+    edit_c_defines = []
     enriched_params = []
     slot_idx = 0
     for idx, p in enumerate(manifest.get("params", [])):
@@ -83,9 +87,23 @@ def synthesize_sh_params_h(manifest: dict) -> tuple[str, list[dict]]:
         slot_idx += 1
         param_defines.append(f"#define {macro} {slot}")
 
+        k = idx + 2
+        emacro = "SH_EDIT_" + re.sub(r"[^A-Za-z0-9]", "_", p_name).upper()
+        edit_c_defines.append(f"#define {emacro} Aw_P{k}_edit_c")
+        edit_c_defines.append(f"void Aw_P{k}_edit_c(int click, float *coeff, void **ctx, int slot);")
+
         values = p.get("values")
         p_max = p.get("max", (len(values) - 1) if values else 100)
         p_def = p.get("default", 0)
+        q31_default = p.get("q31_default")
+        if q31_default is None and p.get("lfo_sync"):
+            ls = p["lfo_sync"]
+            min_dhz = int(ls["min_dhz"])
+            max_dhz = int(ls["max_dhz"])
+            step_dhz = int(ls.get("step_dhz", 1))
+            hz_max_click = (max_dhz - min_dhz) // step_dhz
+            hz = (min_dhz + p_def * step_dhz) * 0.1 if p_def <= hz_max_click else 2.0
+            q31_default = int(round(hz * 97391.548))
         enriched_params.append({
             "index": idx,
             "name": p_name,
@@ -94,15 +112,18 @@ def synthesize_sh_params_h(manifest: dict) -> tuple[str, list[dict]]:
             "max": p_max,
             "default": p_def,
             "defaultCoeff": param_default_coeff(p),
+            "q31Default": int(q31_default) if q31_default is not None else None,
             "curve": p.get("curve", "linear"),
             "values": values,
             "timeSync": p.get("time_sync"),
+            "lfoSync": p.get("lfo_sync"),
             "footswitchToggle": bool(p.get("footswitch_toggle", False)),
             "explanation": p.get("explanation", ""),
         })
 
     header = f"""#ifndef SH_PARAMS_H
 #define SH_PARAMS_H
+#include <stdint.h>
 
 #define SH_AUDIO_FN {fn_name}
 void {fn_name}(void **instance, void **ctx);
@@ -123,6 +144,45 @@ void {fn_name}(void **instance, void **ctx);
 #define SH_NUM_PARAMS    {len(param_defines)}
 {chr(10).join(param_defines)}
 
+typedef int (*sh_note_to_ms_fn)(int note_idx, int max_ms);
+
+static inline int sh_note_to_ms(void **ctx, int note_idx, int max_ms) {{
+    sh_note_to_ms_fn fn = ctx ? (sh_note_to_ms_fn)ctx[34] : (sh_note_to_ms_fn)0;
+    if (!fn) return 0;
+    int ms = fn(note_idx, max_ms);
+    return (ms > 0 && ms <= max_ms) ? ms : 0;
+}}
+
+typedef void (*sh_ramp_f32_fn)(float *dest, float target, float rate);
+typedef void (*sh_ramp_i32_fn)(int32_t *dest, int32_t target, int32_t rate);
+
+static inline void sh_ramp_f32(void **ctx, float *dest, float target, float rate) {{
+    sh_ramp_f32_fn fn = ctx ? (sh_ramp_f32_fn)ctx[3] : (sh_ramp_f32_fn)0;
+    if (fn) fn(dest, target, rate); else *dest = target;
+}}
+
+static inline void sh_smooth_f32(void **ctx, float *dest, float target, float rate) {{
+    sh_ramp_f32_fn fn = ctx ? (sh_ramp_f32_fn)ctx[4] : (sh_ramp_f32_fn)0;
+    if (fn) fn(dest, target, rate); else *dest = target;
+}}
+
+static inline void sh_ramp_i32(void **ctx, int32_t *dest, int32_t target, int32_t rate) {{
+    sh_ramp_i32_fn fn = ctx ? (sh_ramp_i32_fn)ctx[5] : (sh_ramp_i32_fn)0;
+    if (fn) fn(dest, target, rate); else *dest = target;
+}}
+
+static inline void sh_smooth_i32(void **ctx, int32_t *dest, int32_t target, int32_t rate) {{
+    sh_ramp_i32_fn fn = ctx ? (sh_ramp_i32_fn)ctx[6] : (sh_ramp_i32_fn)0;
+    if (fn) fn(dest, target, rate); else *dest = target;
+}}
+
+#define SH_BIND_EDIT(target, fn) \\
+    void target(int click, float *coeff, void **ctx, int slot) {{ \\
+        fn(click, coeff, ctx, slot); \\
+    }}
+
+{chr(10).join(edit_c_defines)}
+
 #endif
 """
     return header, enriched_params
@@ -135,10 +195,17 @@ def make_wasm_shim(fn_name: str, enriched_params: list[dict], needs_sdram: bool)
         for p in enriched_params
     )
     init_bypass = "0.0f" if default_unlatch else "1.0f"
-    init_coefs = "\n".join(
-        f"    g_coef[{p['slot']}] = {float(p['defaultCoeff']):.9f}f;"
-        for p in enriched_params
-    )
+    init_coef_lines = []
+    for p in enriched_params:
+        if p.get("q31Default") is not None:
+            init_coef_lines.append(
+                f"    ((int32_t *)g_coef)[{p['slot']}] = {int(p['q31Default'])};"
+            )
+        else:
+            init_coef_lines.append(
+                f"    g_coef[{p['slot']}] = {float(p['defaultCoeff']):.9f}f;"
+            )
+    init_coefs = "\n".join(init_coef_lines)
     return f"""
 /* ==== WebAssembly AudioWorklet Shim ==== */
 #include <stddef.h>
@@ -170,7 +237,10 @@ static float    g_shuttle[32];
 static float    g_legacy[32];
 static uint32_t g_dd[3];
 static void    *g_instance[4];
-static void    *g_ctx[9];
+static void    *g_ctx[45];
+static int32_t  g_lfo_ramp_sink = 0;
+static int32_t *g_lfo_ramp_dst  = &g_lfo_ramp_sink;
+static int32_t  g_lfo_ramp_buf[16];
 static uint8_t  g_sdram[WASM_SDRAM_BYTES] __attribute__((aligned(16)));
 
 static float    g_bypass_target = {init_bypass};
@@ -207,12 +277,17 @@ void wasm_init(void) {{
     g_instance[2] = (void *)g_state;
     g_instance[3] = (void *)g_dd;
 
-    for (uint32_t i = 0; i < 9u; i++) g_ctx[i] = (void *)0;
+    for (uint32_t i = 0; i < 45u; i++) g_ctx[i] = (void *)0;
+    for (uint32_t i = 0; i < 16u; i++) g_lfo_ramp_buf[i] = 0;
+    g_lfo_ramp_sink = 0;
+    g_lfo_ramp_dst  = &g_lfo_ramp_sink;
     g_ctx[SH_CTX_GTRIN]     = (void *)g_gtrin;
     g_ctx[SH_CTX_EFF]       = (void *)g_eff;
     g_ctx[SH_CTX_OUT]       = (void *)g_aux;
     g_ctx[SH_CTX_SHUTTLE]   = (void *)g_shuttle;
     g_ctx[SH_CTX_LEGACY_IN] = (void *)g_legacy;
+    g_ctx[9]                = (void *)&g_lfo_ramp_dst;
+    g_ctx[10]               = (void *)g_lfo_ramp_buf;
 }}
 
 __attribute__((export_name("wasm_reset_audio")))
