@@ -7,6 +7,9 @@
 
 First and foremost, a huge thank you to **thammer** for all the hard work that went into building [stomphacks](https://github.com/thammer/stomphacks). Reverse-engineering the Zoom MultiStomp Plus binary format, documenting the bare-metal TI TMS320C674x ABI and safety invariants, and creating the end-to-end `.ZD2` build, verification, and pedal-backup toolchain laid the entire foundation that makes custom effects on these pedals possible. This project consumes `stomphacks` directly as a Git submodule (`vendor/stomphacks`) and builds on top of that foundation.
 
+> [!NOTE]
+> **Fork dependency:** `zoom-faust-fx` currently depends on [nealstewart/stomphacks](https://github.com/nealstewart/stomphacks) (branch `minimal-fixes`) for some fixes not yet in upstream `thammer/stomphacks`. Point `STOMPHACKS_DIR` (or `--stomphacks-dir`) at a checkout of that fork.
+
 The goal of **zoom-faust-fx** is to let you write custom audio effects for the Zoom **MS-70CDR+** (and compatible MS Plus pedals) in **[Faust](https://faust.grame.fr/)** (`.dsp`) instead of hand-writing bare-metal C674x C. It provides a Faust-to-ZD2 compiler (`tools/faust2zd2.py`) that enforces the pedal's real-time, call-free, and memory-budget constraints (including external SDRAM delay lines at `instance[3]`), pairs each effect with a custom 1-bit pixel-art pedal icon (`tools/pixel_icons.py`), and includes a local C test harness, C674x cycle/memory benchmarks, and a WebAssembly browser auditioner (`web/`) so you can design and test effects before ever loading them onto hardware.
 
 ---
@@ -156,7 +159,7 @@ pixi run web
     Start-Process "$env:TEMP\$($asset.name)" -Wait
     ```
     Then add `C:\Program Files\Faust\bin` to your `PATH` and verify with `faust --version`.
-- **`stomphacks`** checkout (with `zoom-zt2` initialized) — set `STOMPHACKS_DIR=/path/to/stomphacks` (or pass `--stomphacks-dir`).
+- **`stomphacks`** checkout (with `zoom-zt2` initialized) — currently requires the [`nealstewart/stomphacks`](https://github.com/nealstewart/stomphacks) fork (`minimal-fixes` branch) for some fixes; set `STOMPHACKS_DIR=/path/to/stomphacks` (or pass `--stomphacks-dir`).
 - **TI C6000 CGT `8.5.0.LTS`** — set `ZOOM_TI_CGT` to its install directory (or place it at `<stomphacks_dir>/.tools/ti-cgt-c6000_8.5.0.LTS`).
 - **Podman** (optional, for running the containerized `linux/amd64` Studio server via `podman compose up`).
 
