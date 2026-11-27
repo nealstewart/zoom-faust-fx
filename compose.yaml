@@ -1,0 +1,51 @@
+# Podman Compose configuration for Stomphacks Browser IDE + Build & Pedal Server
+# Usage:
+#   Windows / macOS (Web MIDI mode):  podman compose up
+#   Linux (Direct ALSA USB-MIDI):     podman compose --profile linux-midi up
+
+services:
+  stomphacks:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: stomphacks-server:latest
+    platform: linux/amd64
+    ports:
+      - "8000:8000"
+    environment:
+      - STOMPHACKS_DIR=/opt/stomphacks
+      - ZOOM_TI_CGT=/opt/ti/c6000
+      - STOMPHACKS_PROFILE=podman
+      - STOMPHACKS_WORK_DIR=/app/build/jobs
+      - STOMPHACKS_SESSION_DIR=/app/session
+      - STOMPHACKS_BACKUP_DIR=/app/backup
+    volumes:
+      - ti-cgt:/opt/ti/c6000:ro
+      - ./session:/app/session
+      - ./backup:/app/backup
+      - ./build:/app/build
+
+  stomphacks-linux-midi:
+    image: stomphacks-server:latest
+    platform: linux/amd64
+    profiles: ["linux-midi"]
+    ports:
+      - "8000:8000"
+    devices:
+      - /dev/snd:/dev/snd
+    environment:
+      - STOMPHACKS_DIR=/opt/stomphacks
+      - ZOOM_TI_CGT=/opt/ti/c6000
+      - STOMPHACKS_PROFILE=podman
+      - STOMPHACKS_DIRECT_MIDI=1
+      - STOMPHACKS_WORK_DIR=/app/build/jobs
+      - STOMPHACKS_SESSION_DIR=/app/session
+      - STOMPHACKS_BACKUP_DIR=/app/backup
+    volumes:
+      - ti-cgt:/opt/ti/c6000:ro
+      - ./session:/app/session
+      - ./backup:/app/backup
+      - ./build:/app/build
+
+volumes:
+  ti-cgt:

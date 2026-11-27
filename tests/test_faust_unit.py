@@ -29,10 +29,12 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 if str(ROOT / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT / "tools"))
 
-from faust2zd2_pkg import (
+from zoom_faust_fx.postprocess import (
     FaustMemoryLimitError,
     FaustMemoryReport,
     FaustMeta,

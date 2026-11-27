@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zoom Faust FX Studio — Faust IDE, C6000 Build & Pedal Manager</title>
+  <link rel="stylesheet" href="styles.css?v=3" />
+  <link rel="stylesheet" href="studio.css?v=2" />
+</head>
+<body>
+  <div id="rescueBanner" class="rescue-banner hidden" role="alert">
+    <div class="rescue-banner-content">
+      <strong>DO NOT POWER CYCLE THE PEDAL!</strong>
+      <span id="rescueBannerReason">A transfer failed verification. Keep the pedal powered and run Rescue.</span>
+    </div>
+    <button id="bannerRescueBtn" type="button" class="btn btn-danger">Run Rescue Now</button>
+  </div>
+
+  <div class="studio-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-logo">FX</div>
+        <div>
+          <h1>ZOOM FAUST FX STUDIO <span class="badge-wasm">PODMAN IDE</span></h1>
+          <div class="subtitle">Faust DSP → WASM Preview → TI C674x .ZD2/.ZIC → Safe Pedal Install</div>
+        </div>
+      </div>
+      <div class="studio-header-actions">
+        <span id="capBadge" class="status-pill">Checking server…</span>
+        <a href="reference.html" class="btn btn-ghost btn-sm">📚 Faust Reference</a>
+        <a href="index.html" class="btn btn-ghost btn-sm">← WASM Auditioner</a>
+      </div>
+    </header>
+
+    <!-- Test Synth Bar (TB-303 Acid Sequencer & Keyboard for WASM Preview) -->
+    <section class="source-bar">
+      <div class="source-tabs">
+        <span class="tab-btn active">Test Synth</span>
+      </div>
+      <div id="panel-synth" class="source-panel active">
+        <div class="synth-primary">
+          <button id="autoRiffBtn" type="button" class="btn btn-primary">▶ 303 Loop</button>
+          <button id="acidRandBtn" type="button" class="btn btn-ghost btn-sm" title="Generate a new random 16-step acid bassline">🎲</button>
+        </div>
+        <div id="synthExtras" class="synth-extras">
+          <select id="synthVoiceSelect" class="select-input">
+            <option value="acid_saw">TB-303 Acid Saw</option>
+            <option value="acid_sqr">TB-303 Acid Square</option>
+            <option value="pluck">Pluck</option>
+            <option value="pad">Dreamy Pad</option>
+          </select>
+          <select id="acidPatternSelect" class="select-input" title="Synth sequence pattern">
+            <option value="acid1">Acid 1 (Classic)</option>
+            <option value="acid2">Acid 2 (Phuture)</option>
+            <option value="ebm">EBM Octave</option>
+            <option value="minimal">Dark Minimal</option>
+            <option value="dreamy_pad">Dreamy Pad (Long)</option>
+          </select>
+          <label class="mini-slider" title="Filter Cutoff">
+            <span>CUT</span>
+            <input id="acidCutoffSlider" type="range" min="0" max="100" value="38" />
+          </label>
+          <label class="mini-slider" title="Filter Resonance">
+            <span>RES</span>
+            <input id="acidResSlider" type="range" min="0" max="100" value="72" />
+          </label>
+          <div id="miniKeyboard" class="mini-keyboard" title="Click keys or use computer keys A-K"></div>
+        </div>
+      </div>
+    </section>
+
+    <main class="studio-grid">
+      <!-- Left Column: Faust DSP Editor + WASM Preview -->
+      <section class="studio-card">
+        <div class="card-head">
+          <h2>1. Faust DSP &amp; Live WASM Preview</h2>
+          <div class="card-actions">
+            <button id="wasmPreviewBtn" type="button" class="btn btn-primary btn-sm">▶ Live WASM Preview</button>
+            <button id="wasmStopBtn" type="button" class="btn btn-ghost btn-sm" disabled>■ Stop</button>
+          </div>
+        </div>
+        <textarea id="dspEditor" class="code-editor mono" spellcheck="false"></textarea>
+        <div class="faust-knobs-section">
+          <div class="faust-knobs-head">
+            <span>Effect Knobs (from Faust UI)</span>
+            <span id="faustKnobCount" class="muted mono">0 knobs</span>
+          </div>
+          <div id="faustKnobsContainer" class="faust-knobs-grid"></div>
+        </div>
+        <div id="wasmStatus" class="status-line muted">
+          WASM Preview: Ready (uses @grame/faustwasm in-browser AudioWorklet).
+        </div>
+      </section>
+
+      <!-- Middle Column: Manifest & 1-Bit Icon Editor -->
+      <section class="studio-card">
+        <div class="card-head">
+          <h2>2. Manifest &amp; 1-Bit Icon</h2>
+          <button id="buildBtn" type="button" class="btn btn-primary btn-sm">⚙ Build .ZD2 / .ZIC</button>
+        </div>
+
+        <div class="form-grid">
+          <label>Effect Name
+            <input id="fxName" type="text" value="MyGain" maxlength="12" />
+          </label>
+          <label>Filename (8 chars)
+            <input id="fxFilename" type="text" value="XXMYGAIN" maxlength="8" />
+          </label>
+          <label>DIY Effect ID (hex)
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input id="fxId" type="text" value="07001000" pattern="(0x)?[0-9a-fA-F]{8}" title="8 hex digits, e.g. 07001000" style="flex:1;min-width:0;" />
+              <button id="nextIdBtn" type="button" class="btn btn-ghost btn-sm" title="Check pedal/catalog and assign next free DIY ID">Next Free</button>
+            </div>
+          </label>
+          <label>Version
+            <input id="fxVersion" type="text" value="1.00" maxlength="6" />
+          </label>
+        </div>
+        <label class="full-label">Description
+          <input id="fxDesc" type="text" value="Custom Faust DSP effect" />
+        </label>
+
+        <div class="icon-editor-wrap">
+          <div class="icon-editor-head">
+            <span>1-Bit Icon Bitmap (32×32)</span>
+            <div class="card-actions icon-tools">
+              <button id="iconDrawBtn" type="button" class="btn btn-ghost btn-sm active" data-tool="draw">Draw</button>
+              <button id="iconEraseBtn" type="button" class="btn btn-ghost btn-sm" data-tool="erase">Erase</button>
+              <button id="iconFillBtn" type="button" class="btn btn-ghost btn-sm" data-tool="fill">Fill</button>
+              <button id="iconSquareBtn" type="button" class="btn btn-ghost btn-sm" data-tool="square">Square</button>
+              <button id="iconCircleBtn" type="button" class="btn btn-ghost btn-sm" data-tool="circle">Circle</button>
+              <button id="iconSineBtn" type="button" class="btn btn-ghost btn-sm" data-tool="sine">Sine</button>
+              <button id="iconSqWaveBtn" type="button" class="btn btn-ghost btn-sm" data-tool="sqwave">SqWave</button>
+              <button id="iconInvertBtn" type="button" class="btn btn-ghost btn-sm">Invert</button>
+              <button id="iconClearBtn" type="button" class="btn btn-ghost btn-sm">Clear</button>
+            </div>
+          </div>
+          <canvas id="iconCanvas" width="320" height="320" class="icon-canvas"></canvas>
+        </div>
+      </section>
+
+      <!-- Right Column: Build Stages, REPORT.md Gate & Pedal Manager -->
+      <section class="studio-card">
+        <div class="card-head">
+          <h2>3. Build Gate &amp; Safe Pedal Copy</h2>
+          <span id="buildGateBadge" class="status-pill">No build</span>
+        </div>
+
+        <div id="stageList" class="stage-list mono"></div>
+        <div id="artifactLinks" class="artifact-links"></div>
+        <pre id="reportViewer" class="report-viewer mono">Run a build to inspect REPORT.md and safety checks.</pre>
+
+        <hr class="divider" />
+
+        <div class="pedal-panel">
+          <div class="pedal-head">
+            <h3>Zoom MS Plus Pedal (SAFETY.md)</h3>
+            <span id="autosaveBadge" class="status-pill">Autosave: Unknown</span>
+          </div>
+          <div class="pedal-actions">
+            <button id="webMidiBtn" type="button" class="btn btn-ghost btn-sm">1. Open Web MIDI</button>
+            <button id="safeConnectBtn" type="button" class="btn btn-primary btn-sm">2. Safe Connect</button>
+            <button id="backupBtn" type="button" class="btn btn-ghost btn-sm" disabled>3. Backup Pedal</button>
+            <button id="installBtn" type="button" class="btn btn-primary btn-sm" disabled>4. Install .ZD2…</button>
+            <button id="uninstallBtn" type="button" class="btn btn-ghost btn-sm" disabled>Uninstall…</button>
+            <button id="rescueBtn" type="button" class="btn btn-danger btn-sm">Rescue</button>
+          </div>
+          <div id="pedalLog" class="pedal-log mono"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Explicit Per-Mutation Confirmation & Anti-Bricking Checklist Modal -->
+  <div id="confirmModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <h2 id="modalTitle">Confirm Pedal Mutation</h2>
+      <div id="modalDetails" class="modal-details mono"></div>
+      <div class="checklist-box">
+        <p class="checklist-title">Mandatory Anti-Bricking Checklist (SAFETY.md):</p>
+        <label class="check-item">
+          <input type="checkbox" class="safety-check" id="chkAutosave" />
+          <span>Autosave is confirmed <strong>OFF</strong> via pedal ACK.</span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" class="safety-check" id="chkBackup" />
+          <span>A current session backup of <code>FLST_SEQ.ZT2</code> and effects exists.</span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" class="safety-check" id="chkUnsaved" />
+          <span>I will test experimental effects ONLY in the unsaved current patch and never save them to a patch slot.</span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" class="safety-check" id="chkNoPower" />
+          <span>If a transfer hangs or fails, I will <strong>NOT power-cycle</strong> the pedal and will run Rescue first.</span>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button id="modalCancelBtn" type="button" class="btn btn-ghost">Cancel</button>
+        <button id="modalConfirmBtn" type="button" class="btn btn-primary" disabled>Confirm &amp; Execute</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="studio.js?v=17"></script>
+</body>
+</html>

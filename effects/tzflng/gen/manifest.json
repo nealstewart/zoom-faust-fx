@@ -6,7 +6,7 @@
   "display": "TZ FLNG",
   "badge": "TZ",
   "description": "Through-zero stereo vocal & tape flanger with external SDRAM delay lines and all-pass feedback dispersion.",
-  "dspload": 29,
+  "dspload": 18.89,
   "kernel": "tzflng.c",
   "kernel_section": "text",
   "allow_stack": true,

@@ -6,7 +6,7 @@
   "display": "XA CHR",
   "badge": "XA",
   "description": "22.05 kHz 3-voice stereo modulation chorus with 16-bit saturation and warm low-pass rolloff.",
-  "dspload": 26,
+  "dspload": 14.46,
   "kernel": "xachr.c",
   "kernel_section": "text",
   "allow_stack": true,

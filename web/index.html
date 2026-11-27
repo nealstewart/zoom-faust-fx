@@ -133,14 +133,22 @@
             <option value="minimal">Dark Minimal</option>
             <option value="dreamy_pad">Dreamy Pad (Long)</option>
           </select>
-          <label class="mini-slider" title="303 Filter Cutoff">
-            <span>CUT</span>
-            <input id="acidCutoffSlider" type="range" min="0" max="100" value="38" />
-          </label>
-          <label class="mini-slider" title="303 Filter Resonance (Squelch)">
-            <span>RES</span>
-            <input id="acidResSlider" type="range" min="0" max="100" value="72" />
-          </label>
+          <div class="synth-knobs-group">
+            <div class="mini-knob-slot" data-label="CUT" data-input="acidCutoffSlider" data-default="38" title="303 Filter Cutoff">
+              <input id="acidCutoffSlider" type="hidden" value="38" />
+            </div>
+            <div class="mini-knob-slot" data-label="RES" data-input="acidResSlider" data-default="72" title="303 Filter Resonance (Squelch)">
+              <input id="acidResSlider" type="hidden" value="72" />
+            </div>
+            <span id="acidEnvGroup" class="acid-env-group">
+              <div class="mini-knob-slot" data-label="F.ENV" data-input="acidFltEnvSlider" data-default="55" title="303 Filter Envelope (Depth &amp; Decay)">
+                <input id="acidFltEnvSlider" type="hidden" value="55" />
+              </div>
+              <div class="mini-knob-slot" data-label="A.ENV" data-input="acidAmpEnvSlider" data-default="55" title="303 Amp Envelope (Gate &amp; Release)">
+                <input id="acidAmpEnvSlider" type="hidden" value="55" />
+              </div>
+            </span>
+          </div>
           <div id="miniKeyboard" class="mini-keyboard" title="Click keys or use computer keys A-K"></div>
         </div>
       </div>

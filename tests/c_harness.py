@@ -258,6 +258,7 @@ void {fn_name}(void **instance, void **ctx);
 #define SH_FRAMES        16
 #define SH_CH_B_OFFSET   16
 #define SH_COEFF_BYPASS  0
+#define SH_COEFF_BPM     15
 #define SH_CTX_GTRIN     0
 #define SH_CTX_EFF       1
 #define SH_CTX_OUT       2
@@ -331,6 +332,7 @@ class KernelHarness:
 
         ctypes.memset(self.coef, 0, ctypes.sizeof(self.coef))
         self.coef[0] = 1.0  # SH_COEFF_BYPASS = 1.0 (100% active)
+        self.coef[15] = 500.0  # SH_COEFF_BPM = 500.0 ms (120 BPM)
 
         free_slots = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
         slot_idx = 0
@@ -366,6 +368,9 @@ class KernelHarness:
 
     def set_bypass_fade(self, fade: float) -> None:
         self.coef[0] = fade
+
+    def set_bpm(self, bpm: float) -> None:
+        self.coef[15] = 60000.0 / max(30.0, min(400.0, float(bpm)))
 
     def run_block(
         self,

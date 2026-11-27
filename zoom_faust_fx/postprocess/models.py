@@ -102,6 +102,7 @@ class FaustParam:
     explanation: Optional[str] = None
     unit: str = ""
     values: Optional[List[str]] = None
+    time_sync: Optional[dict] = None
     scale: str = "linear"
     order: int = 999
 
@@ -137,6 +138,7 @@ class FaustMeta:
     author: Optional[str] = None
     footswitch: Optional[dict] = None
     footswitch_default: int = 0
+    reads_bpm: bool = False
 
 
 def strip_c_comments(code: str) -> str:
@@ -201,6 +203,7 @@ def parse_faust_dsp_metadata(dsp_text: str) -> Tuple[FaustMeta, List[FaustParam]
         explanation = None
         unit = ""
         values = default_values
+        time_sync = None
         scale = "linear"
         for tag_m in re.finditer(r"\[([^\]]+)\]", raw_label):
             t = tag_m.group(1).strip()
@@ -218,6 +221,14 @@ def parse_faust_dsp_metadata(dsp_text: str) -> Tuple[FaustMeta, List[FaustParam]
                     unit = tv
                 elif tk.lower() == "values":
                     values = [x.strip()[:7] for x in tv.split("|") if x.strip()]
+                elif tk.lower() == "time_sync":
+                    parts = tv.split("..")
+                    if len(parts) == 2:
+                        time_sync = {
+                            "min_ms": int(float(parts[0])),
+                            "max_ms": int(float(parts[1])),
+                            "notes": ["1/16", "1/8T", "1/8", "1/4T", "1/8.", "1/4", "1/4."],
+                        }
 
         clean_label = re.sub(r"\[[^\]]*\]", "", raw_label).strip()
         if clean_label in seen_labels:
@@ -234,6 +245,7 @@ def parse_faust_dsp_metadata(dsp_text: str) -> Tuple[FaustMeta, List[FaustParam]
             explanation=explanation,
             unit=unit,
             values=values,
+            time_sync=time_sync,
             scale=scale,
             order=order,
         )

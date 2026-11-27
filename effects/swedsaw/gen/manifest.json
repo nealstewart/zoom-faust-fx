@@ -6,7 +6,7 @@
   "display": "SWED SAW",
   "badge": "SW",
   "description": "High-gain Swedish chainsaw distortion with dual-band resonant mid/high gyrator EQ.",
-  "dspload": 27,
+  "dspload": 19.55,
   "kernel": "swedsaw.c",
   "kernel_section": "text",
   "allow_stack": true,

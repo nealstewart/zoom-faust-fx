@@ -6,7 +6,7 @@
   "display": "ANLG DRV",
   "badge": "AD",
   "description": "Analog-modeled op-amp slew distortion with diode clipping and passive low-pass filter.",
-  "dspload": 21,
+  "dspload": 18.4,
   "kernel": "anlgdrv.c",
   "kernel_section": "text",
   "allow_stack": true,

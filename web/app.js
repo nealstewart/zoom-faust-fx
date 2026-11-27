@@ -87,23 +87,35 @@ const state = {
   tapTimes: [],
 };
 
-const SYNC_BEATS = [0, 0.25, 1 / 3, 0.5, 2 / 3, 0.75, 1.0, 1.5];
-const BEAT_SYNC_SLUGS = new Set(["xadly", "firecho"]);
+const NOTE_LABELS = ["1/16", "1/8T", "1/8", "1/4T", "1/8.", "1/4", "1/4."];
+const NOTE_BEATS = [0.25, 1 / 3, 0.5, 2 / 3, 0.75, 1.0, 1.5];
+const BEAT_SYNC_SLUGS = new Set(["xadly", "firecho", "wtdelay", "rf5cdly"]);
 
 function formatKnobValue(slotObj, param, val) {
-  if (BEAT_SYNC_SLUGS.has(slotObj.slug) && param.name === "Time") {
-    const syncParam = slotObj.effect.params.find((p) => p.name === "Sync");
-    const syncIdx = syncParam ? slotObj.values.get(syncParam.index) : 0;
-    const norm = param.max > 0 ? val / param.max : 0;
-    if (syncIdx > 0) {
-      const bpm = Math.round(60 + norm * 140);
-      const ms = Math.min(700, Math.round((60000 / bpm) * SYNC_BEATS[syncIdx]));
-      return `${bpm} BPM (${ms}ms)`;
+  if (param.timeSync) {
+    const minMs = param.timeSync.min_ms;
+    const maxMs = param.timeSync.max_ms;
+    const notes = param.timeSync.notes || NOTE_LABELS;
+    const msMaxClick = maxMs - minMs;
+    if (val > msMaxClick) {
+      const noteIdx = Math.min(notes.length - 1, Math.max(0, val - msMaxClick - 1));
+      const ms = Math.min(maxMs, Math.round((60000 / state.bpm) * NOTE_BEATS[noteIdx]));
+      return `${notes[noteIdx]} (${ms}ms)`;
     }
-    const ms = Math.round(20 + norm * 680);
-    return `${ms} ms`;
+    return `${minMs + val} ms`;
   }
   return String(val);
+}
+
+function sendBpmCoeff(slotObj, bpm) {
+  if (!state.worklet) return;
+  const qtrMs = 60000.0 / Math.max(40, Math.min(300, bpm));
+  state.worklet.port.postMessage({
+    type: "setParam",
+    slotId: slotObj.id,
+    coeffSlot: 15,
+    coeff: qtrMs,
+  });
 }
 
 function applyBpmToSyncedSlots(bpm) {
@@ -114,13 +126,9 @@ function applyBpmToSyncedSlots(bpm) {
 
   let changed = false;
   for (const slotObj of state.chain) {
-    if (!BEAT_SYNC_SLUGS.has(slotObj.slug)) continue;
-    const syncParam = slotObj.effect.params.find((p) => p.name === "Sync");
-    const timeParam = slotObj.effect.params.find((p) => p.name === "Time");
-    if (!syncParam || !timeParam) continue;
-    if (slotObj.values.get(syncParam.index) > 0) {
-      const timeVal = Math.round(((clampedBpm - 60) / 140) * timeParam.max);
-      setSlotParam(slotObj, timeParam, timeVal);
+    // Push live global BPM quarter-note ms into coef[15] (SH_COEFF_BPM) for all effects
+    sendBpmCoeff(slotObj, clampedBpm);
+    if (BEAT_SYNC_SLUGS.has(slotObj.slug)) {
       changed = true;
     }
   }
@@ -341,6 +349,7 @@ async function pushSlotToWorklet(slotObj, insertIndex) {
     bypassed: slotObj.bypassed,
     insertIndex,
   });
+  sendBpmCoeff(slotObj, state.bpm);
 }
 
 // ---- Chain Management ----
@@ -707,14 +716,21 @@ function scheduleAcidStep(freq, when, stepDur, accent, slide) {
 
   const cutNorm = Number($("acidCutoffSlider")?.value ?? 38) / 100;
   const resNorm = Number($("acidResSlider")?.value ?? 72) / 100;
+  const patVal = $("acidPatternSelect")?.value ?? "acid1";
+  const isAcidLine = patVal === "acid1" || patVal === "acid2";
+  const fltEnvNorm = isAcidLine ? Number($("acidFltEnvSlider")?.value ?? 55) / 100 : 0.55;
+  const ampEnvNorm = isAcidLine ? Number($("acidAmpEnvSlider")?.value ?? 55) / 100 : 0.55;
 
   // Exponential cutoff 90 Hz .. 2800 Hz
   const baseCut = 90 * Math.pow(31, cutNorm);
-  const peakCut = Math.min(11000, baseCut * (accent ? 7.8 : 4.2));
+  const envMult = 1.2 + fltEnvNorm * (accent ? 12.0 : 5.5);
+  const peakCut = Math.min(11500, baseCut * envMult);
   const q1 = 1.0 + resNorm * 14.5 + (accent ? 2.5 : 0);
   const q2 = 0.8 + resNorm * 7.5;
-  const dec = accent ? 0.14 : 0.21;
-  const gate = slide ? stepDur * 1.05 : stepDur * 0.62;
+  const dec = (0.04 + fltEnvNorm * fltEnvNorm * 0.42) * (accent ? 0.72 : 1.0);
+  const gateFrac = 0.16 + ampEnvNorm * 0.82;
+  const gate = slide ? stepDur * 1.05 : stepDur * gateFrac;
+  const ampRel = 0.005 + ampEnvNorm * ampEnvNorm * 0.075;
 
   v.f1.Q.setValueAtTime(q1, when);
   v.f2.Q.setValueAtTime(q2, when);
@@ -752,10 +768,10 @@ function scheduleAcidStep(freq, when, stepDur, accent, slide) {
   if (!slide) {
     v.vca.gain.setValueAtTime(0.001, when);
     v.vca.gain.linearRampToValueAtTime(peakAmp, when + 0.004);
-    v.vca.gain.setTargetAtTime(0.0001, when + gate, 0.018);
+    v.vca.gain.setTargetAtTime(0.0001, when + gate, ampRel);
   } else {
     v.vca.gain.linearRampToValueAtTime(peakAmp, when + 0.015);
-    v.vca.gain.setTargetAtTime(0.0001, when + gate, 0.025);
+    v.vca.gain.setTargetAtTime(0.0001, when + gate, ampRel * 1.35);
   }
 }
 
@@ -1307,8 +1323,30 @@ function createKnobControl(slotObj, param) {
   svg.append(track, arc, cap, pointer);
   wrap.appendChild(svg);
 
+  function valToNorm(val) {
+    if (param.timeSync) {
+      const msMax = param.timeSync.max_ms - param.timeSync.min_ms;
+      const nNotes = Math.max(1, param.max - msMax);
+      if (val <= msMax) return (val / Math.max(1, msMax)) * 0.72;
+      return 0.72 + ((val - msMax) / nNotes) * 0.28;
+    }
+    return param.max > 0 ? val / param.max : 0;
+  }
+
+  function normToVal(norm) {
+    const n = Math.max(0, Math.min(1, norm));
+    if (param.timeSync) {
+      const msMax = param.timeSync.max_ms - param.timeSync.min_ms;
+      const nNotes = Math.max(1, param.max - msMax);
+      if (n <= 0.72) return Math.round((n / 0.72) * msMax);
+      const noteStep = Math.max(1, Math.min(nNotes, Math.ceil(((n - 0.72) / 0.28) * nNotes)));
+      return msMax + noteStep;
+    }
+    return Math.round(param.min + n * (param.max - param.min));
+  }
+
   function updateVisual(val) {
-    const norm = param.max > 0 ? val / param.max : 0;
+    const norm = valToNorm(val);
     const deg = startAngle + norm * sweep;
     if (norm <= 0.001) {
       arc.setAttribute("d", "");
@@ -1329,7 +1367,7 @@ function createKnobControl(slotObj, param) {
   let dragging = false;
   let moved = false;
   let startY = 0;
-  let startVal = 0;
+  let startNorm = 0;
   let lastTapTime = 0;
 
   wrap.addEventListener("pointerdown", (e) => {
@@ -1337,7 +1375,7 @@ function createKnobControl(slotObj, param) {
     dragging = true;
     moved = false;
     startY = e.clientY;
-    startVal = slotObj.values.get(param.index);
+    startNorm = valToNorm(slotObj.values.get(param.index));
     try {
       wrap.setPointerCapture(e.pointerId);
     } catch (_) {}
@@ -1347,9 +1385,8 @@ function createKnobControl(slotObj, param) {
     if (!dragging) return;
     const dy = startY - e.clientY;
     if (Math.abs(dy) > 4) moved = true;
-    const range = param.max - param.min;
     const sensitivity = e.shiftKey ? 450 : 150;
-    const nextVal = Math.round(startVal + (dy / sensitivity) * range);
+    const nextVal = normToVal(startNorm + dy / sensitivity);
     const clamped = Math.max(param.min, Math.min(param.max, nextVal));
     if (clamped !== slotObj.values.get(param.index)) {
       setSlotParam(slotObj, param, clamped);
@@ -1379,8 +1416,12 @@ function createKnobControl(slotObj, param) {
     "wheel",
     (e) => {
       e.preventDefault();
-      const step = Math.max(1, Math.round((param.max - param.min) / 40));
       const cur = slotObj.values.get(param.index);
+      let step = Math.max(1, Math.round((param.max - param.min) / 40));
+      if (param.timeSync) {
+        const msMax = param.timeSync.max_ms - param.timeSync.min_ms;
+        step = (cur > msMax || (cur === msMax && e.deltaY < 0)) ? 1 : 15;
+      }
       const next = cur + (e.deltaY < 0 ? step : -step);
       const clamped = Math.max(param.min, Math.min(param.max, next));
       setSlotParam(slotObj, param, clamped);
@@ -1935,7 +1976,112 @@ async function init() {
       acidNextStepTime = state.ctx.currentTime + 0.04;
     }
     updateSeqButtonLabel();
+    updateAcidEnvVisibility();
   });
+  function initMiniSynthKnobs() {
+    const svgNS = "http://www.w3.org/2000/svg";
+    const r = 22, cx = 30, cy = 30, startAngle = -225, sweep = 270;
+    const polar = (deg) => {
+      const rad = (deg * Math.PI) / 180;
+      return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+    };
+    const arcPath = (a0, a1) => {
+      const [x0, y0] = polar(a0);
+      const [x1, y1] = polar(a1);
+      const large = a1 - a0 > 180 ? 1 : 0;
+      return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+    };
+
+    document.querySelectorAll(".mini-knob-slot").forEach((slot) => {
+      const input = $(slot.dataset.input);
+      if (!input) return;
+      const defVal = Number(slot.dataset.default ?? input.value ?? 50);
+
+      const lbl = document.createElement("div");
+      lbl.className = "mini-knob-label";
+      lbl.textContent = slot.dataset.label || "";
+
+      const wrap = document.createElement("div");
+      wrap.className = "knob-wrap mini-knob-wrap";
+
+      const svg = document.createElementNS(svgNS, "svg");
+      svg.setAttribute("viewBox", "0 0 60 60");
+      svg.classList.add("knob-svg", "mini-knob-svg");
+
+      const track = document.createElementNS(svgNS, "path");
+      track.setAttribute("class", "knob-track");
+      track.setAttribute("d", arcPath(startAngle, startAngle + sweep));
+
+      const arc = document.createElementNS(svgNS, "path");
+      arc.setAttribute("class", "knob-arc");
+
+      const cap = document.createElementNS(svgNS, "circle");
+      cap.setAttribute("class", "knob-cap");
+      cap.setAttribute("cx", cx);
+      cap.setAttribute("cy", cy);
+      cap.setAttribute("r", 15);
+
+      const pointer = document.createElementNS(svgNS, "line");
+      pointer.setAttribute("class", "knob-pointer");
+
+      svg.append(track, arc, cap, pointer);
+      wrap.appendChild(svg);
+
+      const valEl = document.createElement("div");
+      valEl.className = "mini-knob-val mono";
+
+      slot.append(lbl, wrap, valEl);
+
+      function setVal(v) {
+        const clamped = Math.max(0, Math.min(100, Math.round(v)));
+        input.value = String(clamped);
+        const norm = clamped / 100;
+        const deg = startAngle + norm * sweep;
+        arc.setAttribute("d", norm <= 0.001 ? "" : arcPath(startAngle, deg));
+        const rad = (deg * Math.PI) / 180;
+        pointer.setAttribute("x1", (cx + 4 * Math.cos(rad)).toFixed(2));
+        pointer.setAttribute("y1", (cy + 4 * Math.sin(rad)).toFixed(2));
+        pointer.setAttribute("x2", (cx + 13 * Math.cos(rad)).toFixed(2));
+        pointer.setAttribute("y2", (cy + 13 * Math.sin(rad)).toFixed(2));
+        valEl.textContent = String(clamped);
+      }
+
+      setVal(Number(input.value));
+
+      let dragging = false, startY = 0, startVal = 0;
+      wrap.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        dragging = true;
+        startY = e.clientY;
+        startVal = Number(input.value);
+        try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
+      });
+      wrap.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        const dy = startY - e.clientY;
+        const sens = e.shiftKey ? 320 : 120;
+        setVal(startVal + (dy / sens) * 100);
+      });
+      const stopDrag = () => { dragging = false; };
+      wrap.addEventListener("pointerup", stopDrag);
+      wrap.addEventListener("pointercancel", stopDrag);
+      wrap.addEventListener("lostpointercapture", stopDrag);
+      wrap.addEventListener("dblclick", () => setVal(defVal));
+      wrap.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        setVal(Number(input.value) + (e.deltaY < 0 ? 3 : -3));
+      }, { passive: false });
+    });
+  }
+  initMiniSynthKnobs();
+
+  function updateAcidEnvVisibility() {
+    const grp = $("acidEnvGroup");
+    if (!grp) return;
+    const pat = $("acidPatternSelect")?.value;
+    grp.hidden = !(pat === "acid1" || pat === "acid2");
+  }
+  updateAcidEnvVisibility();
   $("acidRandBtn").addEventListener("click", () => {
     randomizeAcidPattern();
   });

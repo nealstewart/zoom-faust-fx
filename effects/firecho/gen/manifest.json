@@ -11,7 +11,7 @@
   "kernel_section": "text",
   "allow_stack": true,
   "opt_for_space": null,
-  "state_bytes": 64,
+  "state_bytes": 56,
   "scaffold": "cleanroom",
   "params": [
     {
@@ -26,25 +26,23 @@
       "explanation": "SNES S-DSP 8-tap signed 1.7 FIR preset (RAW, WARM, METAL, CAVE)."
     },
     {
-      "name": "Sync",
-      "values": [
-        "FREE",
-        "1/16",
-        "1/8T",
-        "1/8",
-        "1/4T",
-        "1/8.",
-        "1/4",
-        "1/4."
-      ],
-      "default": 0,
-      "explanation": "Beat-synced note subdivision (FREE = Time in 20..700 ms; 1/16..1/4. = beat-synced with Time as 60..200 BPM)."
-    },
-    {
       "name": "Time",
-      "max": 100,
-      "default": 43,
-      "explanation": "Echo time (20..700 ms when Sync=FREE) or Tempo (60..200 BPM when beat-synced; 43 = 120 BPM)."
+      "max": 687,
+      "default": 300,
+      "explanation": "Echo time: 20..700 ms (clicks 0..680), then 1/16..1/4. synced to pedal BPM.",
+      "time_sync": {
+        "min_ms": 20,
+        "max_ms": 700,
+        "notes": [
+          "1/16",
+          "1/8T",
+          "1/8",
+          "1/4T",
+          "1/8.",
+          "1/4",
+          "1/4."
+        ]
+      }
     },
     {
       "name": "Fdbk",
@@ -83,5 +81,6 @@
       "explanation": "LATCH: normal toggle. UNLATCH: momentary while held."
     }
   ],
-  "footswitch": {}
+  "footswitch": {},
+  "reads_bpm": true
 }

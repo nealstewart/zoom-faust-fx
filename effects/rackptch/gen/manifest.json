@@ -6,7 +6,7 @@
   "display": "RACK PTC",
   "badge": "RP",
   "description": "3-voice dual-tap stereo micro-pitch shifter with 32 kHz / 12-bit rack DAC character and feedback.",
-  "dspload": 22,
+  "dspload": 13.19,
   "kernel": "rackptch.c",
   "kernel_section": "text",
   "allow_stack": true,

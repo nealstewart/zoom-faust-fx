@@ -96,6 +96,7 @@ def synthesize_sh_params_h(manifest: dict) -> tuple[str, list[dict]]:
             "defaultCoeff": param_default_coeff(p),
             "curve": p.get("curve", "linear"),
             "values": values,
+            "timeSync": p.get("time_sync"),
             "footswitchToggle": bool(p.get("footswitch_toggle", False)),
             "explanation": p.get("explanation", ""),
         })
@@ -109,6 +110,7 @@ void {fn_name}(void **instance, void **ctx);
 #define SH_FRAMES        16
 #define SH_CH_B_OFFSET   16
 #define SH_COEFF_BYPASS  0
+#define SH_COEFF_BPM     15
 #define SH_CTX_GTRIN     0
 #define SH_CTX_EFF       1
 #define SH_CTX_OUT       2
@@ -177,6 +179,7 @@ static float    g_bypass_cur    = {init_bypass};
 __attribute__((export_name("wasm_init")))
 void wasm_init(void) {{
     for (uint32_t i = 0; i < 16u; i++) g_coef[i] = 0.0f;
+    g_coef[15] = 500.0f;  /* default 120 BPM quarter-note ms */
     for (uint32_t i = 0; i < WASM_STATE_WORDS; i++) g_state[i] = 0u;
     for (uint32_t i = 0; i < 32u; i++) {{
         g_eff[i] = 0.0f;
@@ -328,10 +331,9 @@ def compile_effect(zig_exe: Path, effect_dir: Path, tmp_dir: Path) -> Optional[d
         raise RuntimeError(f"[{slug}] wasm-ld failed:\n{res_ld.stderr}\n{res_ld.stdout}")
 
     # Render programmatic 1-bit pixel-art icon for every effect (matches Zoom ZIC)
-    tools_dir = str(ROOT / "tools")
-    if tools_dir not in sys.path:
-        sys.path.insert(0, tools_dir)
-    import pixel_icons
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from zoom_faust_fx import pixel_icons
     icon_dst = ICONS_DIR / f"{slug}.png"
     pixel_icons.render_pixel_icon(manifest, (72, 97), effect_dir=effect_dir).save(icon_dst)
     icon_rel = f"dist/icons/{slug}.png"

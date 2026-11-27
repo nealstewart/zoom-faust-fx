@@ -6,7 +6,7 @@
   "display": "SVF FLT",
   "badge": "SF",
   "description": "Resonant 2-pole SVF synth filter + tanh saturator for Zoom MS Plus.",
-  "dspload": 8,
+  "dspload": 5.68,
   "kernel": "svfflt.c",
   "kernel_section": "text",
   "allow_stack": true,

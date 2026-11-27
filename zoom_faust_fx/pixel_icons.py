@@ -35,6 +35,8 @@ from typing import Optional, Tuple
 
 from PIL import Image, ImageDraw
 
+sys.modules.setdefault("pixel_icons", sys.modules[__name__])
+
 # 1-bit monochrome palette matching Zoom MS-70CDR+ LCD (0 = black ink, 255 = white LCD)
 INK = 0
 BG = 255

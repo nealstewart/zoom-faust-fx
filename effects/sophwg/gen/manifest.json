@@ -6,7 +6,7 @@
   "display": "SOPH WG",
   "badge": "SW",
   "description": "SOPHIE-style 4-point morphing Karplus-Strong + comb + triggered pitch-envelope vocal synthesizer (Rubber, Bubble, Squeaky Plastic, Inharmonic Metal).",
-  "dspload": 32,
+  "dspload": 21.19,
   "kernel": "sophwg.c",
   "kernel_section": "text",
   "allow_stack": true,

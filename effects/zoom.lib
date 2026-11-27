@@ -87,3 +87,60 @@ zm_fdelay3(d, x) = de.fdelay3(4096, d, x);
 // `ON/OFF` mode (`LATCH` = 0.0, `UNLATCH` = 1.0).
 zm_fsw_active = 1.0;
 zm_is_unlatch = 1.0;
+
+// Pedal global BPM (Tap Tempo / host BPM module). Evaluates to 120.0 in
+// standard desktop FAUST compilers; in `zoom-faust-fx` maps directly to
+// `coef[SH_COEFF_BPM]` (populated from host `ctx[34](7, 4000)` on hardware
+// and from the toolbar BPM / Tap Tempo in the WebAssembly auditioner).
+zm_bpm = 120.0;
+
+// Convert a beat-subdivision multiplier (0.25=1/16, 0.5=1/8, 0.75=1/8., 1.0=1/4, 1.5=1/4.)
+// to delay time in milliseconds using the pedal's live global BPM, clamped to `max_ms`.
+zm_bpm_ms(beats, max_ms) = min(max_ms, (60000.0 / zm_bpm) * beats);
+
+// Single-knob official Zoom-style Time parameter (`[time_sync:min_ms..max_ms]`):
+//   - clicks `0 .. (max_ms - min_ms)`: direct milliseconds (`min_ms .. max_ms`)
+//   - clicks `(max_ms - min_ms + 1) .. (+7)`: note subdivisions synced to `bpm` (`zm_bpm`)
+//     (1/16, 1/8T, 1/8, 1/4T, 1/8., 1/4, 1/4.)
+zm_time_sync_ms(raw_click, min_ms, max_ms, bpm) =
+    ba.if(raw_click <= ms_max_click + 0.5, free_ms, note_ms)
+    with {
+        ms_max_click = max_ms - min_ms;
+        free_ms      = min_ms + raw_click;
+        note_idx     = int(min(6.0, max(0.0, floor(raw_click - ms_max_click - 0.5))));
+        beats        = ba.if(note_idx < 0.5, 0.25,
+                       ba.if(note_idx < 1.5, 0.3333333,
+                       ba.if(note_idx < 2.5, 0.5,
+                       ba.if(note_idx < 3.5, 0.6666667,
+                       ba.if(note_idx < 4.5, 0.75,
+                       ba.if(note_idx < 5.5, 1.0, 1.5))))));
+        note_ms      = min(max_ms, (60000.0 / bpm) * beats);
+    };
+
+// ---- 6. Standard-Faust Compatibility & Zoom-Sized DSP Algorithms ----
+
+// Convert milliseconds to samples at ma.SR (standard Faust replacement for ba.ms2samp)
+zm_ms2samp(ms) = ms * 0.001 * ma.SR;
+
+// Chamberlin / SVF wrappers compatible with standard Faust (fi.svf.*)
+zm_svf_lp(fc, q, x)   = fi.svf.lp(fc, q, x);
+zm_svf_hp(fc, q, x)   = fi.svf.hp(fc, q, x);
+zm_svf_peak(fc, q, x) = fi.svf.peak(fc, q, x);
+
+// Wavetable-free sine/cosine oscillators (0 KB SDRAM, uses sh_sinf/sh_cosf on C674x)
+zm_osc(f)    = sin(2.0 * ma.PI * os.phasor(1.0, f));
+zm_osccos(f) = cos(2.0 * ma.PI * os.phasor(1.0, f));
+
+// Zoom-sized stereo Schroeder/Freeverb-style reverb (fits < 529 KB SDRAM & C674x budget).
+// Parameters: room in [0, 1], damp in [0, 1], width in [0, 1] (unused/reserved).
+zm_freeverb(room, damp, width, l, r) = tankL(l), tankR(r)
+    with {
+        g = min(0.92, 0.55 + room * 0.35);
+        d = aa.clip(0.05, 0.90, damp);
+        comb(n, x) = (+(x) : de.delay(2048, n) : *(1.0 - d) + (*(d) ~ _)) ~ *(g);
+        apf(n, x)  = fi.allpass_comb(1024, n, 0.5, x);
+        tankL(x) = (comb(1116, x) + comb(1188, x) + comb(1277, x) + comb(1356, x)) * 0.25
+                 : apf(225, _) : apf(556, _);
+        tankR(x) = (comb(1139, x) + comb(1211, x) + comb(1300, x) + comb(1379, x)) * 0.25
+                 : apf(248, _) : apf(579, _);
+    };

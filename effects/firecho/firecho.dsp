@@ -33,14 +33,13 @@ declare zd2_footswitch "true";
 import("stdfaust.lib");
 import("zoom.lib");
 
-// ---- 7 Knobs + Trailing Footswitch Toggle ----
+// ---- 6 Knobs + Trailing Footswitch Toggle ----
 fir_sel    = hslider("FIR[1][values:RAW|WARM|METAL|CAVE][tooltip:SNES S-DSP 8-tap signed 1.7 FIR preset (RAW, WARM, METAL, CAVE).]", 1, 0, 3, 1);
-sync_sel   = hslider("Sync[2][values:FREE|1/16|1/8T|1/8|1/4T|1/8.|1/4|1/4.][tooltip:Beat-synced note subdivision (FREE = Time in 20..700 ms; 1/16..1/4. = beat-synced with Time as 60..200 BPM).]", 0, 0, 7, 1);
-time_knob  = hslider("Time[3][tooltip:Echo time (20..700 ms when Sync=FREE) or Tempo (60..200 BPM when beat-synced; 43 = 120 BPM).]", 43, 0, 100, 1) * 0.01 : si.smoo;
-fdbk_knob  = hslider("Fdbk[4][tooltip:S-DSP EFB echo feedback (0..95).]", 62, 0, 95, 1) * 0.01 : si.smoo;
-wrap_knob  = hslider("SatWrap[5][tooltip:0 = clean 16-bit saturation, 100 = classic SNES S-DSP signed 16-bit overflow wraparound.]", 30, 0, 100, 1) * 0.01 : si.smoo;
-mix_knob   = hslider("Mix[6][tooltip:Dry/Wet echo blend (EVOL, 0..100).]", 45, 0, 100, 1) * 0.01 : si.smoo;
-level_knob = hslider("Level[7][curve:stock_vol][tooltip:Master output level (80 is unity gain).]", 80, 0, 100, 1) : si.smoo;
+time_click = hslider("Time[2][time_sync:20..700][tooltip:Echo time: 20..700 ms (clicks 0..680), then 1/16..1/4. synced to pedal BPM.]", 300, 0, 687, 1);
+fdbk_knob  = hslider("Fdbk[3][tooltip:S-DSP EFB echo feedback (0..95).]", 62, 0, 95, 1) * 0.01 : si.smoo;
+wrap_knob  = hslider("SatWrap[4][tooltip:0 = clean 16-bit saturation, 100 = classic SNES S-DSP signed 16-bit overflow wraparound.]", 30, 0, 100, 1) * 0.01 : si.smoo;
+mix_knob   = hslider("Mix[5][tooltip:Dry/Wet echo blend (EVOL, 0..100).]", 45, 0, 100, 1) * 0.01 : si.smoo;
+level_knob = hslider("Level[6][curve:stock_vol][tooltip:Master output level (80 is unity gain).]", 80, 0, 100, 1) : si.smoo;
 
 // ---- 1. SNES S-DSP 8-Tap Signed 1.7 FIR & Beat-Sync Tables (Hoisted to Block-Rate) ----
 // Coefficients are c_k / 128.0 ordered oldest (c0) to newest (c7).
@@ -58,12 +57,8 @@ sel8(m, v0, v1, v2, v3, v4, v5, v6, v7) =
     ba.if(m < 5.5, v5,
     ba.if(m < 6.5, v6, v7)))))));
 
-// Beat-sync multiplier (beats per repeat): FREE, 1/16, 1/8T, 1/8, 1/4T, 1/8., 1/4, 1/4.
-sync_beats = sel8(sync_sel, 0.0, 0.25, 0.3333333, 0.5, 0.6666667, 0.75, 1.0, 1.5);
-free_ms    = 20.0 + time_knob * 680.0;
-sync_bpm   = 60.0 + time_knob * 140.0;
-sync_ms    = min(700.0, (60000.0 / sync_bpm) * sync_beats);
-time_ms    = ba.if(sync_sel < 0.5, free_ms, sync_ms);
+// Single-knob Zoom-style Time: 0..680 = 20..700 ms, 681..687 = 1/16..1/4. @ zm_bpm
+time_ms = zm_time_sync_ms(time_click, 20.0, 700.0, zm_bpm);
 
 // Stability normalization keeps peak passband gain <= 0.98 so EFB stays safe up to 95%:
 //   RAW: 1.00 | CHRONO: 0.94 | DKC: 0.62 | CAVE: 0.78 (sum=160/128=1.25 -> 0.975)
@@ -80,7 +75,7 @@ c7 = sel4(fir_sel,   0.0,  -7.0,  12.0, 16.0) * fir_norm;
 
 // ---- 2. Block-Rate S-DSP Parameters ----
 // Delay in 44.1 kHz samples (room for 7 extra 32 kHz taps = ~9.65 samples)
-d_base   = aa.clip(32.0, 32600.0, ba.ms2samp(time_ms));
+d_base   = aa.clip(32.0, 32600.0, zm_ms2samp(time_ms));
 // Slight stereo offset (~2.2 ms on right) for authentic SNES stereo echo spread
 d_l      = d_base;
 d_r      = aa.clip(32.0, 32600.0, d_base + 96.0);

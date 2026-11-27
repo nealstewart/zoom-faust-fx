@@ -6,7 +6,7 @@
   "display": "VOCAL FE",
   "badge": "VF",
   "description": "All-in-One Vocal Front-End: 2-pole Butterworth HPF, sidechain-filtered smart gate with hold and floor clamp, zero-latency relative split-band de-esser, and Pade tanh peak catcher.",
-  "dspload": 24,
+  "dspload": 15.03,
   "kernel": "vocalfe.c",
   "kernel_section": "text",
   "allow_stack": true,

@@ -30,7 +30,7 @@ import("zoom.lib");
 
 // ---- 8 Knobs + Trailing Footswitch Toggle ----
 mode_sel    = hslider("Mode[1][values:PING|DUAL|MONO|WIDE][tooltip:RF5C164 stereo echo routing (Ping-Pong, Dual 1:0.75, Mono, Wide Inverted).]", 0, 0, 3, 1);
-time_ms     = hslider("Time[2][unit:ms][tooltip:Delay time (20..740 ms).]", 320, 20, 740, 1) : si.smoo;
+time_click  = hslider("Time[2][time_sync:20..740][tooltip:Delay time: 20..740 ms (clicks 0..720), then 1/16..1/4. synced to pedal BPM.]", 300, 0, 727, 1);
 fdbk_knob   = hslider("Fdbk[3][tooltip:Echo feedback repeats (0..95).]", 52, 0, 95, 1) * 0.01 : si.smoo;
 rate_khz    = hslider("Rate[4][unit:kHz][tooltip:Ricoh RF5C164 PCM clock rate (4..33 kHz; 33 = max 32.55 kHz).]", 22, 4, 33, 1) : si.smoo;
 bits_knob   = hslider("Bits[5][tooltip:8-bit sign-magnitude PCM grit (0 = clean 16-bit CD-DA, 55 = authentic 8-bit RF5C164, 100 = crunchy 5-bit).]", 55, 0, 100, 1) * 0.01 : si.smoo;
@@ -39,7 +39,8 @@ tone_knob   = hslider("Tone[7][tooltip:Sega CD analog output low-pass filter (0 
 mix_knob    = hslider("Mix[8][tooltip:Dry/Wet delay mix (0..100).]", 42, 0, 100, 1) * 0.01 : si.smoo;
 
 // ---- 1. Block-Rate Parameters ----
-d_base = max(44.0, min(32550.0, ba.ms2samp(time_ms)));
+time_ms = zm_time_sync_ms(time_click, 20.0, 740.0, zm_bpm);
+d_base  = max(44.0, min(32550.0, zm_ms2samp(time_ms)));
 
 // Feedback cap at 0.94 to stay musical & bounded
 fb     = min(0.94, fdbk_knob);

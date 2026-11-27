@@ -80,36 +80,58 @@ If none of these are present, a default stompbox icon is generated automatically
 
 ---
 
-## Compiling & Testing
+## Compiling & Testing (`zoom-faust-fx` CLI & Library)
 
-### 1. Transpile `.dsp` → C674x kernel + `manifest.json`
+`zoom-faust-fx` is packaged as a standard Python package (`pyproject.toml`) providing both the `zoom-faust-fx` CLI and the reusable `zoom_faust_fx` library, connecting to a checked-out `stomphacks` repository via `--stomphacks-dir`, `STOMPHACKS_DIR`, or automatic current-directory/sibling detection.
 
-Generates `effects/warmflt/gen/warmflt.c` and `effects/warmflt/gen/manifest.json` and prints the static `instance[2]` state and `instance[3]` SDRAM memory report:
+### 1. Build a `.dsp` file or effect directory into `.ZD2` + `.ZIC`
 
 ```bash
-pixi run python tools/faust2zd2.py effects/warmflt/warmflt.dsp
+export STOMPHACKS_DIR=/path/to/stomphacks
+
+# Build a standalone .dsp file (runs C674x VLIW benchmark to populate manifest.json dspload)
+zoom-faust-fx build effects/svfflt/svfflt.dsp
+
+# Build an effect directory (outputs to effects/svfflt/build/ or --out <dir>)
+zoom-faust-fx build effects/svfflt
+
+# Skip the C674x VLIW benchmark step
+zoom-faust-fx build effects/svfflt --no-benchmark
 ```
 
-### 2. Transpile and build the installable `.ZD2` + `.ZIC`
-
-Pass `--build` to invoke `tools/build_effect.py` (which wraps `vendor/stomphacks/tools/zd2_make_effect.py` and renders the pixel-art `.ZIC` icon):
+### 2. Benchmark, Verify Offline, and Install Safely
 
 ```bash
-pixi run python tools/faust2zd2.py effects/warmflt/warmflt.dsp --build
+# Run standalone C674x VLIW & memory-hierarchy benchmark (supports --json)
+zoom-faust-fx benchmark effects/svfflt/svfflt.dsp
+zoom-faust-fx benchmark effects/ --json
+
+# Verify CRC32, round-trip, container envelope, stock catalog, ZIC, and REPORT.md offline
+zoom-faust-fx check effects/svfflt/build/XXSVFFLT.ZD2
+
+# Install safely via stomphacks/tools-pedal/pedal_diy.py
+zoom-faust-fx install effects/svfflt/build/XXSVFFLT.ZD2 --dry-run
 ```
 
-The compiled and verified `XXWRMFLT.ZD2` and `XXWRMFLT.ZIC` are written to `effects/warmflt/gen/build/`.
+### 3. Python Library API
 
-### 3. Rebuild from an existing `manifest.json` + `.c` kernel
+```python
+from pathlib import Path
+from zoom_faust_fx import benchmark, builder, input_loader
 
-```bash
-pixi run python tools/build_effect.py effects/warmflt/gen/manifest.json
+spec = input_loader.load(Path("effects/svfflt/svfflt.dsp"), stomphacks_dir=Path("/path/to/stomphacks"))
+for event in builder.build_steps(spec, run_benchmark=True):
+    print(f"[{event.stage}] {event.status}: {event.message}")
+    if event.result is not None:
+        result = event.result
+
+assert result.report_passed, result.report_summary
 ```
 
-### 4. Run tests & audition in the browser
+### 4. Tests & Browser Auditioner
 
 ```bash
-# Run Faust compiler and native C kernel tests
+# Run unit and integration tests
 pixi run test
 
 # Compile all effects to WebAssembly and launch the browser auditioner
@@ -121,15 +143,29 @@ pixi run web
 
 ## Setup
 
-```bash
-git clone --recurse-submodules https://github.com/nealstewart/zoom-faust-fx.git
-cd zoom-faust-fx
-pixi install
-```
+### Dependencies
 
-To build `.ZD2` binaries for hardware, also:
-1. Clone `zoom-zt2` into `vendor/stomphacks/zoom-zt2` (per the `stomphacks` README).
-2. Install TI C6000 CGT `8.5.0.LTS` and set `ZOOM_TI_CGT` to its install directory (or place it at `.tools/ti-cgt-c6000_8.5.0.LTS`).
+- **Python 3.12+** (`pip install -e ".[server]"` to include FastAPI & Uvicorn for **Zoom Faust FX Studio**)
+- **[Faust](https://faust.grame.fr/) (`faust` CLI)** — required for full `stdfaust.lib` compilation (`FAUST_REQUIRE_CLI=1` in Podman):
+  - **Linux (Debian/Ubuntu):** `sudo apt-get install faust`
+  - **macOS (Homebrew):** `brew install faust`
+  - **Windows (PowerShell — downloads & runs the latest official `grame-cncm/faust` `win64.exe` installer):**
+    ```powershell
+    $asset = (Invoke-RestMethod "https://api.github.com/repos/grame-cncm/faust/releases/latest").assets | Where-Object { $_.name -match "win64\.exe$" } | Select-Object -First 1
+    Invoke-WebRequest $asset.browser_download_url -OutFile "$env:TEMP\$($asset.name)"
+    Start-Process "$env:TEMP\$($asset.name)" -Wait
+    ```
+    Then add `C:\Program Files\Faust\bin` to your `PATH` and verify with `faust --version`.
+- **`stomphacks`** checkout (with `zoom-zt2` initialized) — set `STOMPHACKS_DIR=/path/to/stomphacks` (or pass `--stomphacks-dir`).
+- **TI C6000 CGT `8.5.0.LTS`** — set `ZOOM_TI_CGT` to its install directory (or place it at `<stomphacks_dir>/.tools/ti-cgt-c6000_8.5.0.LTS`).
+- **Podman** (optional, for running the containerized `linux/amd64` Studio server via `podman compose up`).
+
+```bash
+# Install zoom-faust-fx in editable mode (or via pipx)
+pip install -e /path/to/zoom-faust-fx
+# or directly from GitHub:
+pip install "git+https://github.com/nealstewart/zoom-faust-fx.git"
+```
 
 ---
 

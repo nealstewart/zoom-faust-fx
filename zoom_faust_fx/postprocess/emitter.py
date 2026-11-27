@@ -31,6 +31,9 @@ def _emit_c674x_kernel_from_parts(
     delay_line_count: int = 0,
     delay_step_expr: Optional[str] = None,
     delay_line_len: int = 1024,
+    sdram_arrays: Optional[List[Tuple[str, str, int]]] = None,
+    init_const_lines: Optional[List[str]] = None,
+    bpm_var_name: Optional[str] = None,
 ) -> Tuple[str, int, List[FaustParam]]:
     """
     Assembles the complete, self-contained C674x C kernel source file.
@@ -68,10 +71,7 @@ def _emit_c674x_kernel_from_parts(
         pre_loop = re.sub(rf"\bdsp->{re.escape(p.var_name)}\b", p.var_name, pre_loop)
         loop_inner = re.sub(rf"\bdsp->{re.escape(p.var_name)}\b", p.var_name, loop_inner)
 
-    pre_loop_clean = rewrite_c_divisions_and_math(pre_loop)
-    loop_inner_clean = rewrite_c_divisions_and_math(loop_inner)
-
-    uses_out1 = bool(re.search(r"\bout1\b", loop_inner_clean))
+    uses_out1 = bool(re.search(r"\bout1\b", loop_inner))
     mono_tail = "\n        out1 = out0;" if not uses_out1 else ""
 
     def _build_state_io_lines(
@@ -99,14 +99,20 @@ def _emit_c674x_kernel_from_parts(
         return u_lines, s_lines, c_lines
 
     unpack_lines, scrub_lines, commit_lines = _build_state_io_lines(state_vars, "    ")
+    sdram_arr_list = list(sdram_arrays or [])
+    sdram_arr_names = {vname for _, vname, _ in sdram_arr_list}
 
     def replace_dsp_refs(code_str: str) -> str:
+        if bpm_var_name:
+            code_str = re.sub(rf"\bdsp->{re.escape(bpm_var_name)}\b", bpm_var_name, code_str)
+        for vname in sdram_arr_names:
+            code_str = re.sub(rf"\bdsp->{re.escape(vname)}\b", f"st_{vname}", code_str)
         code_str = re.sub(r"\bdsp->(\w+)\[(\d+)\]", r"st_\1_\2", code_str)
         code_str = re.sub(r"\bdsp->(\w+)\b", r"st_\1", code_str)
         return code_str
 
-    pre_loop_clean = replace_dsp_refs(pre_loop_clean)
-    loop_inner_clean = replace_dsp_refs(loop_inner_clean)
+    pre_loop_clean = rewrite_c_divisions_and_math(replace_dsp_refs(pre_loop))
+    loop_inner_clean = rewrite_c_divisions_and_math(replace_dsp_refs(loop_inner))
 
     coef_load_lines = ["    float fade = coef[SH_COEFF_BYPASS];"]
     coef_check_lines = ["    if (!(fade >= 0.0f && fade <= 1.0f)) ok = 0u;"]
@@ -135,19 +141,40 @@ def _emit_c674x_kernel_from_parts(
                     f"    float {p.var_name} = {p.min_val:.6f}f + {cvar} * {span:.6f}f;"
                 )
 
+    if bpm_var_name:
+        slider_map_lines.append("    float host_qtr_ms = coef[SH_COEFF_BPM];")
+        slider_map_lines.append(
+            "    if (!(host_qtr_ms >= 150.0f && host_qtr_ms <= 2000.0f)) host_qtr_ms = 500.0f;"
+        )
+        slider_map_lines.append(
+            f"    float {bpm_var_name} = sh_fdiv(60000.0f, host_qtr_ms);"
+        )
+
+    init_const_list = [
+        rewrite_c_divisions_and_math(replace_dsp_refs(line))
+        for line in (init_const_lines or [])
+    ]
     smoo_lines = []
-    if smoo_bindings:
+    if smoo_bindings or init_const_list or sdram_arr_list:
         smoo_lines.append("    if (pstate->init_magic != 0x46535431u) {")
+        for ctype, vname, alen in sdram_arr_list:
+            zero_val = "0" if ctype == "int" else "0.0f"
+            smoo_lines.append(
+                f"        for (int _k = 0; _k < {alen}; _k++) st_{vname}[_k] = {zero_val};"
+            )
+        for line in init_const_list:
+            smoo_lines.append(f"        {line}")
         for svar, texpr in smoo_bindings:
             texpr_clean = replace_dsp_refs(rewrite_c_divisions_and_math(texpr))
             smoo_lines.append(f"        st_{svar} = {texpr_clean};")
         smoo_lines.append("        pstate->init_magic = 0x46535431u;")
-        smoo_lines.append("    } else {")
-        for svar, texpr in smoo_bindings:
-            texpr_clean = replace_dsp_refs(rewrite_c_divisions_and_math(texpr))
-            smoo_lines.append(
-                f"        st_{svar} += 0.03152f * (({texpr_clean}) - st_{svar});"
-            )
+        if smoo_bindings:
+            smoo_lines.append("    } else {")
+            for svar, texpr in smoo_bindings:
+                texpr_clean = replace_dsp_refs(rewrite_c_divisions_and_math(texpr))
+                smoo_lines.append(
+                    f"        st_{svar} += 0.03152f * (({texpr_clean}) - st_{svar});"
+                )
         smoo_lines.append("    }")
 
     sdram_guard_lines = []
@@ -200,6 +227,37 @@ def _emit_c674x_kernel_from_parts(
             wpos_step_tail = f"\n        st_{delay_wpos_var} = (st_{delay_wpos_var} + ((({step_clean}) > 0.5f) ? 1u : 0u)) & {p2_mask}u;"
         else:
             wpos_step_tail = f"\n        st_{delay_wpos_var} = (st_{delay_wpos_var} + 1u) & {p2_mask}u;"
+    elif sdram_arr_list:
+        offset_words = 0
+        arr_offsets: List[Tuple[str, str, int, int]] = []
+        for ctype, vname, alen in sdram_arr_list:
+            arr_offsets.append((ctype, vname, alen, offset_words))
+            offset_words += alen + 16  # +64 B L1D cache-set skew
+        need_bytes = offset_words * 4
+        if need_bytes > MAX_SAFE_SDRAM_BYTES:
+            raise FaustMemoryLimitError(
+                f"FAUST DSP requires {need_bytes} bytes of instance[3] SDRAM array memory, "
+                f"exceeding the {MAX_SAFE_SDRAM_BYTES}-byte safety cap."
+            )
+        sdram_guard_lines = [
+            "    const uint32_t * restrict dd = (const uint32_t * restrict)instance[3];",
+            "    uintptr_t dbaseAddr = 0u;",
+            "    if (!dd) {",
+            "        ok = 0u;",
+            "    } else {",
+            "        uint32_t b = dd[0], e = dd[1], sz = dd[2];",
+            f"        if (b == 0u || (b & 3u) != 0u || sz < {need_bytes}u || e <= b || (uint32_t)(e - b) != sz) {{",
+            "            ok = 0u;",
+            "        } else {",
+            "            dbaseAddr = (uintptr_t)b;",
+            "        }",
+            "    }",
+        ]
+        for ctype, vname, _alen, off in arr_offsets:
+            ptr_type = "int" if ctype == "int" else "float"
+            sdram_ptr_lines.append(
+                f"    {ptr_type} * restrict st_{vname} = (({ptr_type} *)dbaseAddr) + {off}u;"
+            )
 
     loop_section_c = f"""    /* ---- 5. FAUST sample-rate loop (16 frames, stereo in-place) -------- */
 #ifdef __TI_COMPILER_VERSION__
@@ -316,7 +374,10 @@ def build_manifest_dict(
     """Create the `manifest.json` structure for `tools/zd2_make_effect.py`."""
     manifest_params = []
     for p in params:
-        if p.is_stock_vol and not p.values:
+        if p.time_sync:
+            ts = p.time_sync
+            steps = (int(ts["max_ms"]) - int(ts["min_ms"])) + len(ts["notes"])
+        elif p.is_stock_vol and not p.values:
             steps = 100
         else:
             steps = int(round((p.max_val - p.min_val) / p.step)) if p.step > 0 else 100
@@ -351,6 +412,8 @@ def build_manifest_dict(
             }
             if p.is_stock_vol:
                 entry["curve"] = "stock_vol"
+            if p.time_sync:
+                entry["time_sync"] = p.time_sync
         manifest_params.append(entry)
 
     if meta.footswitch is not None:
@@ -384,6 +447,8 @@ def build_manifest_dict(
     }
     if meta.footswitch is not None:
         m["footswitch"] = meta.footswitch
+    if meta.reads_bpm:
+        m["reads_bpm"] = True
     if meta.author:
         m["author"] = meta.author
     return m

@@ -6,12 +6,12 @@
   "display": "XA DLY",
   "badge": "XA",
   "description": "22.05 kHz half-rate / BBD hybrid stereo echo with 4 modes (Echo, Ping-Pong, Tape, Dark) and beat-synced subdivisions.",
-  "dspload": 20.05,
+  "dspload": 30,
   "kernel": "xadly.c",
   "kernel_section": "text",
   "allow_stack": true,
   "opt_for_space": null,
-  "state_bytes": 120,
+  "state_bytes": 88,
   "scaffold": "cleanroom",
   "params": [
     {
@@ -26,25 +26,23 @@
       "explanation": "Echo topology (ECHO = PS1 stereo, PING = ping-pong, TAPE = multi-head space echo, DARK = deep BBD dub)."
     },
     {
-      "name": "Sync",
-      "values": [
-        "FREE",
-        "1/16",
-        "1/8T",
-        "1/8",
-        "1/4T",
-        "1/8.",
-        "1/4",
-        "1/4."
-      ],
-      "default": 0,
-      "explanation": "Beat-synced note subdivision (FREE = Time in 20..700 ms; 1/16..1/4. = beat-synced with Time as 60..200 BPM)."
-    },
-    {
       "name": "Time",
-      "max": 100,
-      "default": 43,
-      "explanation": "Delay time (20..700 ms when Sync=FREE) or Tempo (60..200 BPM when beat-synced; 43 = 120 BPM)."
+      "max": 687,
+      "default": 300,
+      "explanation": "Delay time: 20..700 ms (clicks 0..680), then 1/16..1/4. synced to pedal BPM.",
+      "time_sync": {
+        "min_ms": 20,
+        "max_ms": 700,
+        "notes": [
+          "1/16",
+          "1/8T",
+          "1/8",
+          "1/4T",
+          "1/8.",
+          "1/4",
+          "1/4."
+        ]
+      }
     },
     {
       "name": "Fdbk",
@@ -95,5 +93,6 @@
       "explanation": "LATCH: normal toggle. UNLATCH: momentary while held."
     }
   ],
-  "footswitch": {}
+  "footswitch": {},
+  "reads_bpm": true
 }

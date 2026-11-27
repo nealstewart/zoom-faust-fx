@@ -6,7 +6,7 @@
   "display": "STUT RTCH",
   "badge": "SR",
   "description": "FAUST 3s SDRAM stutter & random ratchet looper (UNLATCH=retro grab, LATCH=auto transient) with random SRR/BRR, driven analog LPF, and clean HPF.",
-  "dspload": 27,
+  "dspload": 19.34,
   "kernel": "stutrtch.c",
   "kernel_section": "text",
   "allow_stack": true,

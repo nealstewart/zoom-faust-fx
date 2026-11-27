@@ -6,7 +6,7 @@
   "display": "CD SKIP",
   "badge": "CD",
   "description": "Scratched-CD / failing Discman tracking-skip & CIRC read-error burst looper (UNLATCH=retro grab, LATCH=auto transient) with laser-hunt, stereo desync, and clean Butterworth LPF.",
-  "dspload": 27,
+  "dspload": 18.42,
   "kernel": "cdskip.c",
   "kernel_section": "text",
   "allow_stack": true,

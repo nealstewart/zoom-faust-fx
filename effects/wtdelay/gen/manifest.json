@@ -1,0 +1,92 @@
+{
+  "name": "WT Delay",
+  "filename": "XXWTDLY",
+  "id": "07001270",
+  "version": "1.00",
+  "display": "WT DELAY",
+  "badge": "WT",
+  "description": "Live wavetable-capture stereo delay with gated 64-frame FIFO, ZOH playback, BPM-synced delayed echo trails, and dry/wet mix.",
+  "dspload": 28,
+  "kernel": "wtdelay.c",
+  "kernel_section": "text",
+  "allow_stack": true,
+  "opt_for_space": null,
+  "state_bytes": 184,
+  "scaffold": "cleanroom",
+  "params": [
+    {
+      "name": "Rate",
+      "max": 100,
+      "default": 72,
+      "explanation": "Frame capture rate into the 64-frame FIFO (0 = slow ~370 ms snapshots, 100 = continuous 5.8 ms slices)."
+    },
+    {
+      "name": "Pitch",
+      "max": 96,
+      "default": 48,
+      "explanation": "Wavetable playback pitch in semitones (-24 to +24 st; 0 = native 1x speed)."
+    },
+    {
+      "name": "Time",
+      "max": 667,
+      "default": 665,
+      "explanation": "Delay time: 40..700 ms (clicks 0..660), then 1/16..1/4. synced to pedal BPM (665 = 1/8.).",
+      "time_sync": {
+        "min_ms": 40,
+        "max_ms": 700,
+        "notes": [
+          "1/16",
+          "1/8T",
+          "1/8",
+          "1/4T",
+          "1/8.",
+          "1/4",
+          "1/4."
+        ]
+      }
+    },
+    {
+      "name": "Depth",
+      "max": 100,
+      "default": 25,
+      "explanation": "Wavetable frame-scan drift around each echo's sampled frame (0 = exact sampled frame, 100 = wide history scan)."
+    },
+    {
+      "name": "Mode",
+      "values": [
+        "SAW",
+        "STEP",
+        "TRI",
+        "RND"
+      ],
+      "default": 0,
+      "explanation": "History scan shape (SAW = backward trail sweep, STEP = 4-step rhythmic, TRI = ping-pong drift, RND = random scatter)."
+    },
+    {
+      "name": "Decay",
+      "max": 100,
+      "default": 48,
+      "explanation": "Echo repeat feedback / decay (0 = single brief echo, 100 = long fading wavetable delay trails)."
+    },
+    {
+      "name": "Tone",
+      "max": 100,
+      "default": 65,
+      "explanation": "Wet wavetable low-pass filter cutoff (warm dark pad to raw ZOH aliasing)."
+    },
+    {
+      "name": "Mix",
+      "max": 100,
+      "default": 55,
+      "explanation": "Dry/Wet delay mix (0 = dry, 50 = balanced blend, 100 = 100% wet stereo send)."
+    },
+    {
+      "name": "Level",
+      "max": 100,
+      "default": 80,
+      "explanation": "Master stereo output level (80 is unity).",
+      "curve": "stock_vol"
+    }
+  ],
+  "reads_bpm": true
+}

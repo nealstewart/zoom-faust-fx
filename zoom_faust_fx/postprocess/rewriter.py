@@ -407,6 +407,16 @@ static inline float sh_coshf(float x)
     float e = sh_expf(x);
     return 0.5f * (e + sh_rcp_pos(e));
 }
+
+/* Faust 2.88+ C-backend inline integer & power helpers */
+static inline int faust_wrap_add(int a, int b) { return a + b; }
+static inline int faust_wrap_sub(int a, int b) { return a - b; }
+static inline int faust_wrap_mul(int a, int b) { return a * b; }
+static inline int faustmaxi(int a, int b) { return (a > b) ? a : b; }
+static inline int faustmini(int a, int b) { return (a < b) ? a : b; }
+static inline float mydsp_faustpower2_f(float x) { return x * x; }
+static inline float mydsp_faustpower3_f(float x) { return x * x * x; }
+static inline float mydsp_faustpower4_f(float x) { float x2 = x * x; return x2 * x2; }
 """
 
 

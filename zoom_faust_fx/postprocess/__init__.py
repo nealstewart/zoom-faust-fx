@@ -10,6 +10,14 @@ STRICT STANDARD-FAUST POLICY:
   functions to `faust2zd2_pkg`.
 """
 
+from .allowlist import (
+    ALLOWED_IMPORTS,
+    ALLOWED_MODULES,
+    ALLOWED_MODULE_FUNCTIONS,
+    FaustAllowlistError,
+    validate_expanded_faust,
+    validate_faust_allowlist,
+)
 from .models import (
     MAX_DELAY_LINES,
     MAX_PATTERN_COUNT,
@@ -36,6 +44,12 @@ from .c_backend import convert_faust_c_to_zd2_kernel
 from .emitter import _emit_c674x_kernel_from_parts, build_manifest_dict
 
 __all__ = [
+    "ALLOWED_IMPORTS",
+    "ALLOWED_MODULES",
+    "ALLOWED_MODULE_FUNCTIONS",
+    "FaustAllowlistError",
+    "validate_expanded_faust",
+    "validate_faust_allowlist",
     "MAX_STATE_BYTES",
     "MAX_STATE_WORDS",
     "MAX_SAFE_SDRAM_BYTES",

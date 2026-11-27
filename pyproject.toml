@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zoom-faust-fx"
+version = "0.1.0"
+description = "Standalone Python CLI and shared library to compile Faust DSP or C effects into Zoom MS Plus .ZD2/.ZIC modules"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "construct",
+    "crcmod",
+    "pyelftools",
+    "Pillow",
+    "mido",
+    "python-rtmidi",
+]
+
+[project.optional-dependencies]
+server = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+zoom-faust-fx = "zoom_faust_fx.cli:main"
+zoom-faust-fx-server = "zoom_faust_fx.server.app:main"
+
+[tool.setuptools.packages.find]
+include = ["zoom_faust_fx*"]

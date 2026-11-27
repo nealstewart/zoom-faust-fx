@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zoom Faust FX Studio — Supported &amp; Unsupported Functions</title>
+  <link rel="stylesheet" href="styles.css?v=3" />
+  <link rel="stylesheet" href="studio.css?v=2" />
+  <style>
+    .ref-wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .ref-search-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .ref-search-bar input {
+      flex: 1;
+      background: #0b0e14;
+      color: #e7ecf4;
+      border: 1px solid #2a3448;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 13.5px;
+    }
+    .ref-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .ref-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    .ref-table th,
+    .ref-table td {
+      text-align: left;
+      padding: 7px 8px;
+      border-bottom: 1px solid #222b3b;
+      vertical-align: top;
+    }
+    .ref-table th {
+      color: #9aa8be;
+      font-weight: 600;
+    }
+    .tag-ok {
+      color: #7ee2a8;
+      font-weight: 600;
+    }
+    .tag-no {
+      color: #ff94a0;
+      font-weight: 600;
+    }
+    .ref-row.hidden-row {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="studio-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-logo">FX</div>
+        <div>
+          <h1>ZOOM FAUST FX REFERENCE <span class="badge-wasm">ALLOWLIST</span></h1>
+          <div class="subtitle">Supported &amp; Unsupported Faust Modules, Functions, and Hardware Constraints</div>
+        </div>
+      </div>
+      <div class="studio-header-actions">
+        <a href="studio.html" class="btn btn-primary btn-sm">← Back to Studio</a>
+        <a href="index.html" class="btn btn-ghost btn-sm">WASM Auditioner</a>
+      </div>
+    </header>
+
+    <div class="ref-wrap">
+      <div class="studio-card">
+        <div class="ref-search-bar">
+          <input id="refSearch" type="search" placeholder="Filter by function, module, or note (e.g. freeverb, compressor, svf, hbargraph)..." />
+          <span id="refCount" class="status-pill">Showing all</span>
+        </div>
+      </div>
+
+      <div class="ref-grid">
+        <section class="studio-card">
+          <div class="card-head">
+            <h2>Supported: <code>zoom.lib</code> &amp; Core Modules</h2>
+            <span class="status-pill ok">Allowed</span>
+          </div>
+          <table class="ref-table">
+            <thead>
+              <tr><th>Module / Function</th><th>Status</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+              <tr class="ref-row"><td><code>zm_freeverb(room, damp, width)</code></td><td class="tag-ok">Allowed</td><td>Zoom-sized stereo reverb (`dspload=8.86`, SDRAM).</td></tr>
+              <tr class="ref-row"><td><code>zm_svf_lp / zm_svf_hp / zm_svf_peak</code></td><td class="tag-ok">Allowed</td><td>Standard SVF filters (`dspload=4.86–5.67`).</td></tr>
+              <tr class="ref-row"><td><code>zm_osc / zm_osccos</code></td><td class="tag-ok">Allowed</td><td>Wavetable-free sine/cosine oscillators (`0 KB` SDRAM, `dspload=4.33%`).</td></tr>
+              <tr class="ref-row"><td><code>zm_ms2samp(ms)</code></td><td class="tag-ok">Allowed</td><td>Milliseconds to samples at `ma.SR` (`44100 Hz`).</td></tr>
+              <tr class="ref-row"><td><code>zm_delay / zm_fdelay / zm_fdelay1..3</code></td><td class="tag-ok">Verified</td><td>4096-sample SDRAM ring buffers with L1D skew.</td></tr>
+              <tr class="ref-row"><td><code>zm_ema / zm_allpass1 / zm_soft_clip / zm_quant12 / zm_sat16 / zm_tukey20</code></td><td class="tag-ok">Verified</td><td>Zoom-calibrated filters, saturators, and grain windows.</td></tr>
+              <tr class="ref-row"><td><code>ro.cross, ro.hadamard, ro.interleave, ro.butterfly</code></td><td class="tag-ok">Allowed</td><td>Pure routing, `16 B` state, `~2%` DSP load.</td></tr>
+              <tr class="ref-row"><td><code>sp.panner, sp.stereoize, sp.spat</code></td><td class="tag-ok">Allowed</td><td>Stereo panning/width, `16 B` state, `~2%` DSP load.</td></tr>
+              <tr class="ref-row"><td><code>en.ar, en.asr, en.adsr, en.smoothEnvelope, en.dx7envelope</code></td><td class="tag-ok">Allowed</td><td>Envelopes, `24–48 B` state, `~2.9–6.6%` DSP load.</td></tr>
+              <tr class="ref-row"><td><code>co.compressor_mono, co.compressor_stereo, co.limiter_1176_R4_mono, co.limiter_1176_R4_stereo</code></td><td class="tag-ok">Allowed</td><td>`40–56 B` state; `compressor_mono` stereo is `~26.5%` DSP load (use `*_stereo` to save DSP).</td></tr>
+              <tr class="ref-row"><td><code>ef.cubicnl_nodc, ef.gate_stereo, ef.speakerbp, ef.stereo_width, ef.dryWetMixer, ef.echo, ef.transpose, ef.softclipQuadratic, ef.wavefold</code></td><td class="tag-ok">Allowed</td><td>`dspload=2.0–7.23%`; keep `ef.echo(maxDuration, ...)` under `~1.0 s` (`&lt; 529 KB` SDRAM).</td></tr>
+              <tr class="ref-row"><td><code>re.dattorro_rev, re.jcrev</code></td><td class="tag-ok">Allowed</td><td>Dattorro plate (`dspload=8.52%`) and JCRev (`dspload=8.5%`) pass all 6 checks.</td></tr>
+              <tr class="ref-row"><td><code>ve.moog_vcf, ve.moogLadder, ve.korg35LPF, ve.oberheimLPF, ve.crybaby, ve.autowah, ve.wah4</code></td><td class="tag-ok">Allowed</td><td>Virtual-analog filters &amp; wahs (`dspload=2.43–13.05%`).</td></tr>
+              <tr class="ref-row"><td><code>aa.clip</code></td><td class="tag-ok">Allowed</td><td>Antialiased hard clip (`aa.*`).</td></tr>
+              <tr class="ref-row"><td><code>an.amp_follower_ud</code></td><td class="tag-ok">Allowed</td><td>Envelope follower (`an.*`).</td></tr>
+              <tr class="ref-row"><td><code>ba.if, ba.db2linear, ba.latch, ba.pulse, ba.semi2ratio, ba.sec2samp</code></td><td class="tag-ok">Allowed</td><td>Basic utilities (`ba.*`). Use `zm_ms2samp` for ms.</td></tr>
+              <tr class="ref-row"><td><code>de.delay, de.fdelay, de.fdelay1, de.fdelay2, de.fdelay3</code></td><td class="tag-ok">Allowed</td><td>Use power-of-two buffer sizes (`1024`, `2048`, `4096`) to avoid `%` (`CALLP`).</td></tr>
+              <tr class="ref-row"><td><code>fi.lowpass, fi.highpass, fi.dcblocker, fi.allpass_comb, fi.tf1, fi.svf.*</code></td><td class="tag-ok">Allowed</td><td>Standard IIR/FIR/SVF filters (`fi.*`).</td></tr>
+              <tr class="ref-row"><td><code>ma.SR, ma.tanh, ma.frac, ma.PI</code></td><td class="tag-ok">Allowed</td><td>Math constants &amp; `rewriter.py`-inlined functions (`ma.*`).</td></tr>
+              <tr class="ref-row"><td><code>no.noise, no.pink_noise, no.lfnoise</code></td><td class="tag-ok">Allowed</td><td>Noise generators (`no.*`).</td></tr>
+              <tr class="ref-row"><td><code>os.phasor, os.osc, os.osccos</code></td><td class="tag-ok">Allowed</td><td>Wavetable-free (`os.osc`/`os.osccos` are automatically rewritten to `sin`/`cos` + `os.phasor` for `faust.exe`, `dspload=4.33%`).</td></tr>
+              <tr class="ref-row"><td><code>si.smoo, si.smooth</code></td><td class="tag-ok">Allowed</td><td>Parameter smoothing (`si.*`).</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="studio-card">
+          <div class="card-head">
+            <h2>Unsupported / Blocked Constructs</h2>
+            <span class="status-pill fail">Blocked</span>
+          </div>
+          <table class="ref-table">
+            <thead>
+              <tr><th>Module / Construct</th><th>Status</th><th>Reason</th></tr>
+            </thead>
+            <tbody>
+              <tr class="ref-row"><td><code>re.stereo_freeverb, re.mono_freeverb, re.zita_rev1_stereo, re.jpverb, re.satrev, re.kb_rom_rev1</code></td><td class="tag-no">Hard Limit</td><td>Exceeds `188 B` `instance[2]` / `529,200 B` SDRAM caps or uses static globals. Use <code>re.dattorro_rev</code>, <code>re.jcrev</code>, or <code>zm_freeverb</code>.</td></tr>
+              <tr class="ref-row"><td><code>hbargraph(...)</code>, <code>vbargraph(...)</code></td><td class="tag-no">Blocked</td><td>Zoom MS Plus hardware has no output meter/bargraph channel. Caught transitively via `faust -e`.</td></tr>
+              <tr class="ref-row"><td><code>co.RMS_FBFFcompressor_N_chan</code> / meter-taking <code>co.*</code></td><td class="tag-no">Unsupported</td><td>Requires `hbargraph` meter output or invalid signature.</td></tr>
+              <tr class="ref-row"><td><code>ffunction</code>, <code>fvariable</code>, <code>fconstant</code></td><td class="tag-no">Blocked</td><td>User DSPs cannot inject raw C FFI; non-`&lt;math.h&gt;`/`&lt;stdlib.h&gt;` FFI is rejected transitively.</td></tr>
+              <tr class="ref-row"><td><code>import("...")</code> other than <code>stdfaust.lib</code> / <code>zoom.lib</code></td><td class="tag-no">Blocked</td><td>Arbitrary external libraries are disallowed.</td></tr>
+              <tr class="ref-row"><td><code>pm.*</code> (<code>physmodels.lib</code>)</td><td class="tag-no">Blocked</td><td>Physical-modeling instrument waveguides/tables (<code>pm.guitar_ui_MIDI</code>, <code>pm.marimba</code> fail <code>cl6x</code>), not stereo audio-in pedal effects.</td></tr>
+              <tr class="ref-row"><td><code>ho.*</code> (<code>hoa.lib</code>)</td><td class="tag-no">Blocked</td><td>High-order Ambisonics (<code>2*N+1</code> surround buses) for multi-speaker spatial arrays; Zoom MS Plus is strictly stereo I/O.</td></tr>
+              <tr class="ref-row"><td><code>sy.*</code> (<code>synths.lib</code>)</td><td class="tag-no">Blocked</td><td>Gate/pitch-driven synth &amp; drum generators (<code>kick</code>, <code>clap</code>, <code>dubDub</code>), not audio-in effects (standalone synth voices can be built with <code>os.*</code>, <code>en.*</code>, and <code>fi.*</code>).</td></tr>
+              <tr class="ref-row"><td><code>dx.*</code> (<code>dx7.lib</code>)</td><td class="tag-no">Blocked</td><td>Full 32-algorithm 6-op DX7 FM synthesizer; built for MIDI keyboard synthesis and far too heavy for a pedal slot.</td></tr>
+              <tr class="ref-row"><td><code>wd.*</code> (<code>wdmodels.lib</code>)</td><td class="tag-no">Blocked</td><td>Wave Digital Filter circuit trees; anything beyond a tiny stage expands into deeply coupled expressions that blow C674x register limits / <code>cl6x</code> (e.g. <code>ve.klonCentaur</code> fails <code>cl6x</code>).</td></tr>
+              <tr class="ref-row"><td><code>wa.*</code> (<code>webaudio.lib</code>)</td><td class="tag-no">Blocked</td><td>W3C Web Audio <code>BiquadFilterNode</code> compatibility port; redundant on hardware since <code>fi.*</code> (<code>filters.lib</code>) already covers all standard biquad/SVF/EQ needs.</td></tr>
+              <tr class="ref-row"><td><code>ve.klonCentaur</code> (and untested <code>ve.*</code>)</td><td class="tag-no">Blocked</td><td>Fails `cl6x` (uses `wd.*` Wave Digital Filters). Use `ve.moog_vcf`, `ve.korg35LPF`, `ve.crybaby`, etc.</td></tr>
+              <tr class="ref-row"><td><code>ef.echo2s</code> .. <code>ef.echo43s</code></td><td class="tag-no">Hard Limit</td><td>Exceeds `529,200 B` SDRAM cap (use `ef.echo(0.5, ...)` or `zm_delay`).</td></tr>
+              <tr class="ref-row"><td>Non-power-of-two <code>de.delay(N, ...)</code></td><td class="tag-no">Unsafe</td><td>Emits integer `%` (`CALLP __c6xabi_remi`), rejected by `REPORT.md`.</td></tr>
+              <tr class="ref-row"><td>State &gt; <code>188 B</code> (`instance[2]`) or SDRAM &gt; <code>529,200 B</code> (`instance[3]`)</td><td class="tag-no">Hard Limit</td><td>Rejected by `c_backend.py` / `emitter.py`.</td></tr>
+              <tr class="ref-row"><td>Heavy chained filters/delays spilling <code>B14</code></td><td class="tag-no">Hard Limit</td><td>Exceeding 31 C674x registers causes `cl6x` to use `B14`, rejected by `REPORT.md`.</td></tr>
+              <tr class="ref-row"><td>0 params or &gt; 10 params</td><td class="tag-no">Hard Limit</td><td>Cleanroom `.ZD2` scaffold requires 1–10 UI controls (`hslider`, `vslider`, `nentry`, `checkbox`, `button`).</td></tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const input = document.getElementById("refSearch");
+    const rows = Array.from(document.querySelectorAll(".ref-row"));
+    const countEl = document.getElementById("refCount");
+    input.addEventListener("input", () => {
+      const q = input.value.trim().toLowerCase();
+      let shown = 0;
+      for (const r of rows) {
+        const hit = !q || r.textContent.toLowerCase().includes(q);
+        r.classList.toggle("hidden-row", !hit);
+        if (hit) shown++;
+      }
+      countEl.textContent = q ? `${shown} / ${rows.length} shown` : "Showing all";
+    });
+  </script>
+</body>
+</html>

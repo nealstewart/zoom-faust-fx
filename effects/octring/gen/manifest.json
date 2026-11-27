@@ -6,7 +6,7 @@
   "display": "OCT RING",
   "badge": "SH",
   "description": "Clean-room FAUST Hellektro Octave/Ring-Mod Fuzz: full-wave rectifier octave gnarl, internal carrier ring modulator, and 4x oversampled gated velcro fuzz.",
-  "dspload": 26,
+  "dspload": 19.16,
   "kernel": "octring.c",
   "kernel_section": "text",
   "allow_stack": true,

@@ -248,7 +248,7 @@ class FaustSubsetCompiler:
                     )
                 seen.add(fname)
                 lib_text = strip_c_comments(found_path.read_text(encoding="utf-8"))
-                lib_text = re.sub(r"\bzm_(?:fsw_active|is_unlatch)\s*=\s*[^;]+;", "", lib_text)
+                lib_text = re.sub(r"\bzm_(?:fsw_active|is_unlatch|bpm)\s*=\s*[^;]+;", "", lib_text)
                 text = text[: m.start()] + "\n" + lib_text + "\n" + text[m.end() :]
                 changed = True
                 break
@@ -426,6 +426,7 @@ class FaustSubsetCompiler:
             delay_line_count=self.delay_line_count,
             delay_step_expr=self.delay_step_expr,
             delay_line_len=self.delay_line_len,
+            bpm_var_name="host_bpm" if self.meta.reads_bpm else None,
         )
 
     def _expand_pattern_macros(self, text: str) -> str:
@@ -1826,6 +1827,10 @@ class FaustSubsetCompiler:
 
             if re.search(r"\bzm_is_unlatch\b", expr):
                 expr = re.sub(r"\bzm_is_unlatch\b", "((fsw_unlatch >= 0.5f) ? 1.0f : 0.0f)", expr)
+
+            if re.search(r"\bzm_bpm\b", expr):
+                self.meta.reads_bpm = True
+                expr = re.sub(r"\bzm_bpm\b", "host_bpm", expr)
 
             if re.search(r"\bno\.noise\b", expr):
                 if "no.noise" in self._noise_cache:

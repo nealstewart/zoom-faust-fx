@@ -6,7 +6,7 @@
   "display": "DESK DRV",
   "badge": "DK",
   "description": "Overdriven compact analog console channel strip preamp with soft clipping and 3-band EQ.",
-  "dspload": 30,
+  "dspload": 23.66,
   "kernel": "deskdrv.c",
   "kernel_section": "text",
   "allow_stack": true,

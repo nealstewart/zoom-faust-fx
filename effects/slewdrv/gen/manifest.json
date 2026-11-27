@@ -6,7 +6,7 @@
   "display": "SLEW DRV",
   "badge": "SL",
   "description": "4x oversampled op-amp slew-rate limiter, hard diode clipper, thermal sag, and tone filter.",
-  "dspload": 21,
+  "dspload": 18.4,
   "kernel": "slewdrv.c",
   "kernel_section": "text",
   "allow_stack": true,

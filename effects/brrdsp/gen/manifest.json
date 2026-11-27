@@ -6,7 +6,7 @@
   "display": "BRR DSP",
   "badge": "BR",
   "description": "16-bit era 4-bit BRR ADPCM codec (F0-F3 predictors), 4-point Gaussian interpolator, 4-32 kHz voice clock, and 4 output models.",
-  "dspload": 20,
+  "dspload": 17.3,
   "kernel": "brrdsp.c",
   "kernel_section": "text",
   "allow_stack": true,

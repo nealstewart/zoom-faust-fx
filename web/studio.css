@@ -1,0 +1,363 @@
+/* Desktop-focused layout for Podman Stomphacks Studio & Pedal Manager */
+html,
+body {
+  height: auto !important;
+  min-height: 100%;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.studio-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg, #0d1016);
+  color: var(--fg, #e7ecf4);
+}
+
+.studio-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.studio-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1.15fr;
+  gap: 14px;
+  padding: 14px;
+  flex: 1;
+  min-height: 0;
+}
+
+.studio-card {
+  background: #141923;
+  border: 1px solid #262f40;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-head h2 {
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.code-editor {
+  width: 100%;
+  flex: 1;
+  min-height: 360px;
+  background: #0b0e14;
+  color: #d8e2f0;
+  border: 1px solid #283245;
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.form-grid label,
+.full-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #9aa8be;
+}
+
+.form-grid input,
+.full-label input {
+  background: #0b0e14;
+  color: #e7ecf4;
+  border: 1px solid #2a3448;
+  border-radius: 5px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.icon-editor-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.icon-editor-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: #9aa8be;
+}
+
+.icon-tools {
+  flex-wrap: wrap;
+}
+
+.icon-tools .btn.active {
+  background: #1d4e89;
+  border-color: #4f94e8;
+  color: #ffffff;
+}
+
+.icon-canvas {
+  background: #080a0f;
+  border: 1px solid #2f3b52;
+  border-radius: 6px;
+  cursor: crosshair;
+  align-self: flex-start;
+  image-rendering: pixelated;
+}
+
+.stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+  font-size: 12px;
+  background: #0b0e14;
+  border: 1px solid #232c3d;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.artifact-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.report-viewer {
+  background: #0b0e14;
+  border: 1px solid #232c3d;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 11.5px;
+  max-height: 150px;
+  overflow: auto;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid #252e40;
+  margin: 4px 0;
+}
+
+.pedal-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pedal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pedal-head h3 {
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.pedal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pedal-log {
+  background: #0b0e14;
+  border: 1px solid #232c3d;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 11.5px;
+  height: 130px;
+  overflow-y: auto;
+}
+
+.status-pill {
+  font-size: 11.5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #1f2736;
+  border: 1px solid #334059;
+}
+
+.status-pill.ok {
+  background: #123322;
+  border-color: #27784e;
+  color: #7ee2a8;
+}
+
+.status-pill.fail {
+  background: #3a1419;
+  border-color: #8c2c38;
+  color: #ff94a0;
+}
+
+.btn-danger {
+  background: #b72838;
+  color: #fff;
+  border: 1px solid #e04658;
+}
+
+.rescue-banner {
+  background: #8d1320;
+  color: #fff;
+  padding: 12px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #ff7b88;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 14, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal-card {
+  width: min(560px, 92vw);
+  background: #151b26;
+  border: 1px solid #35435c;
+  border-radius: 10px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-details {
+  background: #0b0e14;
+  border: 1px solid #253044;
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 12px;
+}
+
+.checklist-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #101520;
+  border: 1px solid #293449;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.checklist-title {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #f6c453;
+}
+
+.check-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.faust-knobs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #0b0e14;
+  border: 1px solid #232c3d;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.faust-knobs-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #9aa8be;
+}
+
+.faust-knobs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.faust-knob-card {
+  background: #141923;
+  border: 1px solid #283245;
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.faust-knob-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11.5px;
+}
+
+.faust-knob-name {
+  font-weight: 600;
+  color: #e7ecf4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.faust-knob-val {
+  color: #7ee2a8;
+  font-size: 11px;
+}
+
+.faust-knob-card input[type="range"] {
+  width: 100%;
+  accent-color: #4f94e8;
+}
+
+.hidden {
+  display: none !important;
+}
