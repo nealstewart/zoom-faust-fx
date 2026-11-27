@@ -15,20 +15,33 @@ const PRESETS = {
   parallel_split: ["wfsplit", "swedsaw", "wfswap", "xarvb", "wfmerge"],
 };
 
+// Renoise / tracker-style 2-octave keyboard layout (C3..B3 on Z-M, C4..C5 on Q-I, plus , L . ; / overlap)
 const KEYBOARD_NOTES = [
-  { note: "C3", key: "a", freq: 130.81, black: false },
-  { note: "C#3", key: "w", freq: 138.59, black: true },
-  { note: "D3", key: "s", freq: 146.83, black: false },
-  { note: "D#3", key: "e", freq: 155.56, black: true },
-  { note: "E3", key: "d", freq: 164.81, black: false },
-  { note: "F3", key: "f", freq: 174.61, black: false },
-  { note: "F#3", key: "t", freq: 185.0, black: true },
-  { note: "G3", key: "g", freq: 196.0, black: false },
-  { note: "G#3", key: "y", freq: 207.65, black: true },
-  { note: "A3", key: "h", freq: 220.0, black: false },
-  { note: "A#3", key: "u", freq: 233.08, black: true },
-  { note: "B3", key: "j", freq: 246.94, black: false },
-  { note: "C4", key: "k", freq: 261.63, black: false },
+  { note: "C3",  key: "z", freq: 130.81, black: false },
+  { note: "C#3", key: "s", freq: 138.59, black: true },
+  { note: "D3",  key: "x", freq: 146.83, black: false },
+  { note: "D#3", key: "d", freq: 155.56, black: true },
+  { note: "E3",  key: "c", freq: 164.81, black: false },
+  { note: "F3",  key: "v", freq: 174.61, black: false },
+  { note: "F#3", key: "g", freq: 185.00, black: true },
+  { note: "G3",  key: "b", freq: 196.00, black: false },
+  { note: "G#3", key: "h", freq: 207.65, black: true },
+  { note: "A3",  key: "n", freq: 220.00, black: false },
+  { note: "A#3", key: "j", freq: 233.08, black: true },
+  { note: "B3",  key: "m", freq: 246.94, black: false },
+  { note: "C4",  key: "q", altKey: ",", freq: 261.63, black: false },
+  { note: "C#4", key: "2", altKey: "l", freq: 277.18, black: true },
+  { note: "D4",  key: "w", altKey: ".", freq: 293.66, black: false },
+  { note: "D#4", key: "3", altKey: ";", freq: 311.13, black: true },
+  { note: "E4",  key: "e", altKey: "/", freq: 329.63, black: false },
+  { note: "F4",  key: "r", freq: 349.23, black: false },
+  { note: "F#4", key: "5", freq: 369.99, black: true },
+  { note: "G4",  key: "t", freq: 392.00, black: false },
+  { note: "G#4", key: "6", freq: 415.30, black: true },
+  { note: "A4",  key: "y", freq: 440.00, black: false },
+  { note: "A#4", key: "7", freq: 466.16, black: true },
+  { note: "B4",  key: "u", freq: 493.88, black: false },
+  { note: "C5",  key: "i", freq: 523.25, black: false },
 ];
 
 const state = {
@@ -2344,9 +2357,9 @@ async function init() {
     }
     if (state.activeSourceTab === "synth") {
       const k = e.key.toLowerCase();
-      const note = KEYBOARD_NOTES.find((n) => n.key === k);
+      const note = KEYBOARD_NOTES.find((n) => n.key === k || n.altKey === k);
       if (note) {
-        const btn = document.querySelector(`.key-btn[data-key="${k}"]`);
+        const btn = document.querySelector(`.key-btn[data-key="${note.key}"]`);
         if (btn) btn.classList.add("pressed");
         triggerSynthNote(note.freq);
       }
@@ -2355,7 +2368,9 @@ async function init() {
 
   window.addEventListener("keyup", (e) => {
     const k = e.key.toLowerCase();
-    const btn = document.querySelector(`.key-btn[data-key="${k}"]`);
+    const note = KEYBOARD_NOTES.find((n) => n.key === k || n.altKey === k);
+    if (!note) return;
+    const btn = document.querySelector(`.key-btn[data-key="${note.key}"]`);
     if (btn) btn.classList.remove("pressed");
   });
 
