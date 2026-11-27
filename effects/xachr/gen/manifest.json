@@ -6,12 +6,12 @@
   "display": "XA CHR",
   "badge": "XA",
   "description": "22.05 kHz 3-voice stereo modulation chorus with 16-bit saturation and warm low-pass rolloff.",
-  "dspload": 14.46,
+  "dspload": 26,
   "kernel": "xachr.c",
   "kernel_section": "text",
   "allow_stack": true,
   "opt_for_space": null,
-  "state_bytes": 64,
+  "state_bytes": 56,
   "scaffold": "cleanroom",
   "params": [
     {
@@ -27,9 +27,27 @@
     },
     {
       "name": "Rate",
-      "max": 100,
-      "default": 24,
-      "explanation": "Modulation speed (0.10..5.50 Hz)."
+      "max": 64,
+      "default": 3,
+      "explanation": "Modulation speed (0.1..5.5 Hz, then 1/32..1/2 synced to pedal BPM).",
+      "bpm_sync": true,
+      "lfo_sync": {
+        "min_dhz": 1,
+        "max_dhz": 55,
+        "step_dhz": 1,
+        "notes": [
+          "1/32",
+          "1/16",
+          "1/8T",
+          "1/16.",
+          "1/8",
+          "1/4T",
+          "1/8.",
+          "1/4",
+          "1/4.",
+          "1/2"
+        ]
+      }
     },
     {
       "name": "Depth",

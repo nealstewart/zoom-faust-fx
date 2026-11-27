@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>FAUST FX — WebAssembly Pedalboard Auditioner</title>
-  <link rel="stylesheet" href="styles.css?v=3" />
+  <link rel="stylesheet" href="styles.css?v=5" />
 </head>
 <body>
   <!-- Shared SVG definitions for rotary knobs -->
@@ -120,19 +120,21 @@
           <button id="toggleSynthExtrasBtn" type="button" class="btn btn-ghost btn-sm mobile-only" aria-expanded="false" title="Show/hide synth voice, filter & keyboard">Tone ▾</button>
         </div>
         <div id="synthExtras" class="synth-extras">
-          <select id="synthVoiceSelect" class="select-input">
-            <option value="acid_saw">TB-303 Acid Saw</option>
-            <option value="acid_sqr">TB-303 Acid Square</option>
-            <option value="pluck">Pluck</option>
-            <option value="pad">Dreamy Pad</option>
-          </select>
-          <select id="acidPatternSelect" class="select-input" title="Synth sequence pattern (synced to toolbar BPM)">
-            <option value="acid1">Acid 1 (Classic)</option>
-            <option value="acid2">Acid 2 (Phuture)</option>
-            <option value="ebm">EBM Octave</option>
-            <option value="minimal">Dark Minimal</option>
-            <option value="dreamy_pad">Dreamy Pad (Long)</option>
-          </select>
+          <div class="synth-selects">
+            <select id="synthVoiceSelect" class="select-input" title="Synth voice">
+              <option value="acid_saw">TB-303 Acid Saw</option>
+              <option value="acid_sqr">TB-303 Acid Square</option>
+              <option value="pluck">Pluck</option>
+              <option value="pad">Dreamy Pad</option>
+            </select>
+            <select id="acidPatternSelect" class="select-input" title="Synth sequence pattern (synced to toolbar BPM)">
+              <option value="acid1">Acid 1 (Classic)</option>
+              <option value="acid2">Acid 2 (Phuture)</option>
+              <option value="ebm">EBM Octave</option>
+              <option value="minimal">Dark Minimal</option>
+              <option value="dreamy_pad">Dreamy Pad (Long)</option>
+            </select>
+          </div>
           <div class="synth-knobs-group">
             <div class="mini-knob-slot" data-label="CUT" data-input="acidCutoffSlider" data-default="38" title="303 Filter Cutoff">
               <input id="acidCutoffSlider" type="hidden" value="38" />
@@ -225,6 +227,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=3"></script>
+  <script type="module" src="app.js?v=4"></script>
 </body>
 </html>

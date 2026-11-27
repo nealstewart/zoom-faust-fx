@@ -404,6 +404,16 @@ static inline float sh_coshf(float x)
     return 0.5f * (e + sh_rcp_pos(e));
 }
 
+/* Faust 2.88+ C-backend inline integer & power helpers */
+static inline int faust_wrap_add(int a, int b) { return a + b; }
+static inline int faust_wrap_sub(int a, int b) { return a - b; }
+static inline int faust_wrap_mul(int a, int b) { return a * b; }
+static inline int faustmaxi(int a, int b) { return (a > b) ? a : b; }
+static inline int faustmini(int a, int b) { return (a < b) ? a : b; }
+static inline float mydsp_faustpower2_f(float x) { return x * x; }
+static inline float mydsp_faustpower3_f(float x) { return x * x * x; }
+static inline float mydsp_faustpower4_f(float x) { float x2 = x * x; return x2 * x2; }
+
 
 /* Persistent FAUST DSP state mapped directly onto instance[2] (zero stack copy!) */
 typedef struct {
@@ -412,20 +422,20 @@ typedef struct {
     float fRec_fb_rf5c_sh_step_1_M_4;
     float fSmoo_5;
     float fSmoo_6;
-    uint32_t iRng_7;
-    float fPulse_M_8;
-    float fLatch_M_9;
-    float fSmoo_21;
-    float fSmoo_23;
-    float fRec_smoo_M_24;
+    float fSmoo_18;
+    float fSmoo_20;
+    float fRec_smoo_M_21;
+    float fRec_smoo_M_22;
     float fRec_smoo_M_25;
-    float fRec_smoo_M_28;
-    float fRec_fb_rf5c_sh_step_0_M_33;
-    float fRec_fb_rf5c_sh_step_1_M_34;
-    float fRec_smoo_M_45;
+    float fRec_fb_rf5c_sh_step_0_M_30;
+    float fRec_fb_rf5c_sh_step_1_M_31;
+    float fRec_smoo_M_42;
+    float fRec_smoo_M_43;
     float fRec_smoo_M_46;
-    float fRec_smoo_M_49;
-    float fSmoo_54;
+    float fSmoo_51;
+    uint32_t lfo_ph_0;
+    uint32_t lfo_rng_0;
+    float lfo_hold_0;
     uint32_t init_magic;
 } faust_zd2_state_t;
 
@@ -487,38 +497,37 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     float st_fRec_fb_rf5c_sh_step_1_M_4 = pstate->fRec_fb_rf5c_sh_step_1_M_4;
     float st_fSmoo_5 = pstate->fSmoo_5;
     float st_fSmoo_6 = pstate->fSmoo_6;
-    uint32_t st_iRng_7 = pstate->iRng_7;
-    float st_fPulse_M_8 = pstate->fPulse_M_8;
-    float st_fLatch_M_9 = pstate->fLatch_M_9;
-    float st_fSmoo_21 = pstate->fSmoo_21;
-    float st_fSmoo_23 = pstate->fSmoo_23;
-    float st_fRec_smoo_M_24 = pstate->fRec_smoo_M_24;
+    float st_fSmoo_18 = pstate->fSmoo_18;
+    float st_fSmoo_20 = pstate->fSmoo_20;
+    float st_fRec_smoo_M_21 = pstate->fRec_smoo_M_21;
+    float st_fRec_smoo_M_22 = pstate->fRec_smoo_M_22;
     float st_fRec_smoo_M_25 = pstate->fRec_smoo_M_25;
-    float st_fRec_smoo_M_28 = pstate->fRec_smoo_M_28;
-    float st_fRec_fb_rf5c_sh_step_0_M_33 = pstate->fRec_fb_rf5c_sh_step_0_M_33;
-    float st_fRec_fb_rf5c_sh_step_1_M_34 = pstate->fRec_fb_rf5c_sh_step_1_M_34;
-    float st_fRec_smoo_M_45 = pstate->fRec_smoo_M_45;
+    float st_fRec_fb_rf5c_sh_step_0_M_30 = pstate->fRec_fb_rf5c_sh_step_0_M_30;
+    float st_fRec_fb_rf5c_sh_step_1_M_31 = pstate->fRec_fb_rf5c_sh_step_1_M_31;
+    float st_fRec_smoo_M_42 = pstate->fRec_smoo_M_42;
+    float st_fRec_smoo_M_43 = pstate->fRec_smoo_M_43;
     float st_fRec_smoo_M_46 = pstate->fRec_smoo_M_46;
-    float st_fRec_smoo_M_49 = pstate->fRec_smoo_M_49;
-    float st_fSmoo_54 = pstate->fSmoo_54;
+    float st_fSmoo_51 = pstate->fSmoo_51;
+    uint32_t st_lfo_ph_0 = pstate->lfo_ph_0;
+    uint32_t st_lfo_rng_0 = pstate->lfo_rng_0;
+    float st_lfo_hold_0 = pstate->lfo_hold_0;
     if (!(st_fSmoo_0 > -1.0e12f && st_fSmoo_0 < 1.0e12f)) st_fSmoo_0 = 0.0f;
     if (!(st_fRec_fb_rf5c_sh_step_0_M_3 > -1.0e12f && st_fRec_fb_rf5c_sh_step_0_M_3 < 1.0e12f)) st_fRec_fb_rf5c_sh_step_0_M_3 = 0.0f;
     if (!(st_fRec_fb_rf5c_sh_step_1_M_4 > -1.0e12f && st_fRec_fb_rf5c_sh_step_1_M_4 < 1.0e12f)) st_fRec_fb_rf5c_sh_step_1_M_4 = 0.0f;
     if (!(st_fSmoo_5 > -1.0e12f && st_fSmoo_5 < 1.0e12f)) st_fSmoo_5 = 0.0f;
     if (!(st_fSmoo_6 > -1.0e12f && st_fSmoo_6 < 1.0e12f)) st_fSmoo_6 = 0.0f;
-    if (!(st_fPulse_M_8 > -1.0e12f && st_fPulse_M_8 < 1.0e12f)) st_fPulse_M_8 = 0.0f;
-    if (!(st_fLatch_M_9 > -1.0e12f && st_fLatch_M_9 < 1.0e12f)) st_fLatch_M_9 = 0.0f;
-    if (!(st_fSmoo_21 > -1.0e12f && st_fSmoo_21 < 1.0e12f)) st_fSmoo_21 = 0.0f;
-    if (!(st_fSmoo_23 > -1.0e12f && st_fSmoo_23 < 1.0e12f)) st_fSmoo_23 = 0.0f;
-    if (!(st_fRec_smoo_M_24 > -1.0e12f && st_fRec_smoo_M_24 < 1.0e12f)) st_fRec_smoo_M_24 = 0.0f;
+    if (!(st_fSmoo_18 > -1.0e12f && st_fSmoo_18 < 1.0e12f)) st_fSmoo_18 = 0.0f;
+    if (!(st_fSmoo_20 > -1.0e12f && st_fSmoo_20 < 1.0e12f)) st_fSmoo_20 = 0.0f;
+    if (!(st_fRec_smoo_M_21 > -1.0e12f && st_fRec_smoo_M_21 < 1.0e12f)) st_fRec_smoo_M_21 = 0.0f;
+    if (!(st_fRec_smoo_M_22 > -1.0e12f && st_fRec_smoo_M_22 < 1.0e12f)) st_fRec_smoo_M_22 = 0.0f;
     if (!(st_fRec_smoo_M_25 > -1.0e12f && st_fRec_smoo_M_25 < 1.0e12f)) st_fRec_smoo_M_25 = 0.0f;
-    if (!(st_fRec_smoo_M_28 > -1.0e12f && st_fRec_smoo_M_28 < 1.0e12f)) st_fRec_smoo_M_28 = 0.0f;
-    if (!(st_fRec_fb_rf5c_sh_step_0_M_33 > -1.0e12f && st_fRec_fb_rf5c_sh_step_0_M_33 < 1.0e12f)) st_fRec_fb_rf5c_sh_step_0_M_33 = 0.0f;
-    if (!(st_fRec_fb_rf5c_sh_step_1_M_34 > -1.0e12f && st_fRec_fb_rf5c_sh_step_1_M_34 < 1.0e12f)) st_fRec_fb_rf5c_sh_step_1_M_34 = 0.0f;
-    if (!(st_fRec_smoo_M_45 > -1.0e12f && st_fRec_smoo_M_45 < 1.0e12f)) st_fRec_smoo_M_45 = 0.0f;
+    if (!(st_fRec_fb_rf5c_sh_step_0_M_30 > -1.0e12f && st_fRec_fb_rf5c_sh_step_0_M_30 < 1.0e12f)) st_fRec_fb_rf5c_sh_step_0_M_30 = 0.0f;
+    if (!(st_fRec_fb_rf5c_sh_step_1_M_31 > -1.0e12f && st_fRec_fb_rf5c_sh_step_1_M_31 < 1.0e12f)) st_fRec_fb_rf5c_sh_step_1_M_31 = 0.0f;
+    if (!(st_fRec_smoo_M_42 > -1.0e12f && st_fRec_smoo_M_42 < 1.0e12f)) st_fRec_smoo_M_42 = 0.0f;
+    if (!(st_fRec_smoo_M_43 > -1.0e12f && st_fRec_smoo_M_43 < 1.0e12f)) st_fRec_smoo_M_43 = 0.0f;
     if (!(st_fRec_smoo_M_46 > -1.0e12f && st_fRec_smoo_M_46 < 1.0e12f)) st_fRec_smoo_M_46 = 0.0f;
-    if (!(st_fRec_smoo_M_49 > -1.0e12f && st_fRec_smoo_M_49 < 1.0e12f)) st_fRec_smoo_M_49 = 0.0f;
-    if (!(st_fSmoo_54 > -1.0e12f && st_fSmoo_54 < 1.0e12f)) st_fSmoo_54 = 0.0f;
+    if (!(st_fSmoo_51 > -1.0e12f && st_fSmoo_51 < 1.0e12f)) st_fSmoo_51 = 0.0f;
+    if (!(st_lfo_hold_0 > -1.0e12f && st_lfo_hold_0 < 1.0e12f)) st_lfo_hold_0 = 0.0f;
 
 
     /* ---- 3. Map normalized Zoom coefficients [0..1] to FAUST sliders --- */
@@ -535,17 +544,17 @@ void SH_AUDIO_FN(void **instance, void **ctx)
         st_fSmoo_0 = fHslider5 * 0.01f;
         st_fSmoo_5 = fHslider1;
         st_fSmoo_6 = fHslider3 * 0.01f;
-        st_fSmoo_21 = fHslider2 * 0.01f;
-        st_fSmoo_23 = fHslider4 * 0.01f;
-        st_fSmoo_54 = fHslider6;
+        st_fSmoo_18 = fHslider2 * 0.01f;
+        st_fSmoo_20 = fHslider4 * 0.01f;
+        st_fSmoo_51 = fHslider6;
         pstate->init_magic = 0x46535431u;
     } else {
         st_fSmoo_0 += 0.03152f * ((fHslider5 * 0.01f) - st_fSmoo_0);
         st_fSmoo_5 += 0.03152f * ((fHslider1) - st_fSmoo_5);
         st_fSmoo_6 += 0.03152f * ((fHslider3 * 0.01f) - st_fSmoo_6);
-        st_fSmoo_21 += 0.03152f * ((fHslider2 * 0.01f) - st_fSmoo_21);
-        st_fSmoo_23 += 0.03152f * ((fHslider4 * 0.01f) - st_fSmoo_23);
-        st_fSmoo_54 += 0.03152f * ((fHslider6) - st_fSmoo_54);
+        st_fSmoo_18 += 0.03152f * ((fHslider2 * 0.01f) - st_fSmoo_18);
+        st_fSmoo_20 += 0.03152f * ((fHslider4 * 0.01f) - st_fSmoo_20);
+        st_fSmoo_51 += 0.03152f * ((fHslider6) - st_fSmoo_51);
     }
     float k_drive_knob_0 = st_fSmoo_0;
     float k_drv_gain_1 = 1.0f + k_drive_knob_0 * (2.2f + 4.0f * k_drive_knob_0);
@@ -556,17 +565,12 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     float k_clk_step_base_6 = k_fn_5;
     float k_clkjit_knob_7 = st_fSmoo_6;
     float k_jit_depth_8 = k_clkjit_knob_7 * (0.28f + 0.42f * k_clkjit_knob_7);
-    if (st_iRng_7 == 0u) st_iRng_7 = 0x52415431u;
-    st_iRng_7 ^= st_iRng_7 << 13;
-    st_iRng_7 ^= st_iRng_7 >> 17;
-    st_iRng_7 ^= st_iRng_7 << 5;
-    float k_white_noise = (float)((int32_t)st_iRng_7) * 4.6566129e-10f;
-    float k_bits_knob_9 = st_fSmoo_21;
+    float k_bits_knob_9 = st_fSmoo_18;
     float k_fn_10 = sh_floorf(11.0f + (1.0f - k_bits_knob_9) * (1.0f - k_bits_knob_9) * 570.0f);
     float k_fn_11 = sh_maxf(11.0f, k_fn_10);
     float k_fn_12 = ((k_bits_knob_9 < 0.01f) ? (0.0f) : (k_fn_11));
     float k_mag_levels_13 = k_fn_12;
-    float k_tone_knob_14 = st_fSmoo_23;
+    float k_tone_knob_14 = st_fSmoo_20;
     float k_model_sel_15 = fHslider0;
     float k_fn_16 = (((k_model_sel_15) < 2.5f) ? ((0.72f)) : ((0.98f)));
     float k_fn_17 = (((k_model_sel_15) < 1.5f) ? ((0.42f)) : (k_fn_16));
@@ -582,9 +586,34 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     float k_fn_27 = (((k_model_sel_15) < 1.5f) ? ((0.72f)) : (k_fn_26));
     float k_fn_28 = (((k_model_sel_15) < 0.5f) ? ((0.88f)) : (k_fn_27));
     float k_st_width_29 = (k_fn_28);
-    float k_level_knob_30 = st_fSmoo_54;
+    float k_level_knob_30 = st_fSmoo_51;
     float k_drv_comp_31 = sh_fdiv(1.0f, (1.0f + k_drive_knob_0 * 1.55f));
     float k_out_gain_32 = k_level_knob_30 * k_drv_comp_31;
+
+    /* ---- 4b. Stock-style Q31 LFO Loop 1 (16 frames, ctx[9..10]) ------- */
+    float sh_lfo_0[SH_FRAMES];
+    {
+        uint32_t ph_0 = st_lfo_ph_0;
+        uint32_t inc_0 = (uint32_t)(int32_t)sh_maxf(0.0f, (200.0f) * 97391.548f);
+        uint32_t rng_0 = st_lfo_rng_0;
+        float hold_0 = st_lfo_hold_0;
+#ifdef __TI_COMPILER_VERSION__
+#pragma MUST_ITERATE(SH_FRAMES, SH_FRAMES)
+#pragma UNROLL(1)
+#endif
+        for (i0 = 0; i0 < SH_FRAMES; i0++) {
+            uint32_t prev_ph_0 = ph_0;
+            ph_0 += inc_0;
+            if (ph_0 < prev_ph_0 || rng_0 == 0u) {
+                rng_0 = rng_0 * 1664525u + 1013904223u;
+                hold_0 = (float)((int32_t)(rng_0 >> 8)) * (1.0f / 8388608.0f);
+            }
+            sh_lfo_0[i0] = hold_0;
+        }
+        st_lfo_ph_0 = ph_0;
+        st_lfo_rng_0 = rng_0;
+        st_lfo_hold_0 = hold_0;
+    }
 
     /* ---- 5. FAUST sample-rate loop (16 frames, stereo in-place) -------- */
 #ifdef __TI_COMPILER_VERSION__
@@ -605,55 +634,52 @@ void SH_AUDIO_FN(void **instance, void **ctx)
 
         float fWith_zm_soft_clip_xc_1 = sh_clipf(((in0) * k_drv_gain_1), -1.5f, 1.5f);
         float fWith_rf5c_chan_driven_2 = ((fWith_zm_soft_clip_xc_1) - 0.14814815f * (fWith_zm_soft_clip_xc_1) * (fWith_zm_soft_clip_xc_1) * (fWith_zm_soft_clip_xc_1));
-        st_fPulse_M_8 += 1.0f;
-        if (st_fPulse_M_8 >= (220.0f)) st_fPulse_M_8 = 0.0f;
-        st_fLatch_M_9 = ((((st_fPulse_M_8 < (1.0f)) ? 1.0f : 0.0f)) > 0.5f) ? (k_white_noise) : st_fLatch_M_9;
-        float fSig_sh_rand_10 = st_fLatch_M_9;
-        float fSig_clk_step_11 = sh_clipf(k_clk_step_base_6 * (1.0f + k_jit_depth_8 * fSig_sh_rand_10), 0.068f, 0.73814f);
-        float fWith_rf5c_sh_step_ph_sum_12 = (st_fRec_fb_rf5c_sh_step_0_M_3) + fSig_clk_step_11;
-        float fWith_rf5c_sh_step_tk_13 = (((fWith_rf5c_sh_step_ph_sum_12) >= 1.0f) ? (1.0f) : (0.0f));
-        float fWith_rf5c_sh_step_next_ph_14 = (fWith_rf5c_sh_step_ph_sum_12) - (fWith_rf5c_sh_step_tk_13);
-        float fWith_rf5c_sh_step_next_hold_15 = (((fWith_rf5c_sh_step_tk_13) > 0.5f) ? ((fWith_rf5c_chan_driven_2)) : ((st_fRec_fb_rf5c_sh_step_1_M_4)));
-        float fRecNext_rf5c_sh_step_16 = (fWith_rf5c_sh_step_next_ph_14);
-        float fRecNext_rf5c_sh_step_17 = (fWith_rf5c_sh_step_next_hold_15);
-        float fRecOut_rf5c_sh_step_18 = (fWith_rf5c_sh_step_next_hold_15);
-        st_fRec_fb_rf5c_sh_step_0_M_3 = fRecNext_rf5c_sh_step_16;
-        st_fRec_fb_rf5c_sh_step_1_M_4 = fRecNext_rf5c_sh_step_17;
-        float fWith_rf5c_chan_held_19 = (fRecOut_rf5c_sh_step_18);
-        float fWith_rf5c_quant_sign_x_20 = (((fWith_rf5c_chan_held_19) >= 0.0f) ? (1.0f) : (-1.0f));
-        float fWith_rf5c_chan_quant_22 = (((k_mag_levels_13 < 1.0f) ? ((fWith_rf5c_chan_held_19)) : (((sh_fabsf((fWith_rf5c_chan_held_19)) < 1.0e-6f) ? (0.0f) : ((fWith_rf5c_quant_sign_x_20) * sh_fdiv(sh_floorf(sh_minf(1.0f, sh_fabsf((fWith_rf5c_chan_held_19))) * k_mag_levels_13), k_mag_levels_13))))));
-        st_fRec_smoo_M_24 += (k_smoo_a_23) * (((fWith_rf5c_chan_quant_22)) - st_fRec_smoo_M_24);
-        st_fRec_smoo_M_25 += (k_smoo_a_23) * (((st_fRec_smoo_M_24)) - st_fRec_smoo_M_25);
-        float fWith_rf5c_chan_filt_26 = (st_fRec_smoo_M_25);
-        float fWith_rf5c_chan_shaped_27 = ((k_is_raw_tap_25 > 0.5f) ? ((fWith_rf5c_chan_quant_22)) : ((fWith_rf5c_chan_filt_26)));
-        st_fRec_smoo_M_28 += (0.004f) * (((fWith_rf5c_chan_shaped_27)) - st_fRec_smoo_M_28);
-        float fWith_rf5c_chan_out_29 = (fWith_rf5c_chan_shaped_27) - (st_fRec_smoo_M_28);
-        float fWith_process_cL_30 = ((fWith_rf5c_chan_out_29));
-        float fWith_zm_soft_clip_xc_31 = sh_clipf(((in1) * k_drv_gain_1), -1.5f, 1.5f);
-        float fWith_rf5c_chan_driven_32 = ((fWith_zm_soft_clip_xc_31) - 0.14814815f * (fWith_zm_soft_clip_xc_31) * (fWith_zm_soft_clip_xc_31) * (fWith_zm_soft_clip_xc_31));
-        float fWith_rf5c_sh_step_ph_sum_35 = (st_fRec_fb_rf5c_sh_step_0_M_33) + fSig_clk_step_11;
-        float fWith_rf5c_sh_step_tk_36 = (((fWith_rf5c_sh_step_ph_sum_35) >= 1.0f) ? (1.0f) : (0.0f));
-        float fWith_rf5c_sh_step_next_ph_37 = (fWith_rf5c_sh_step_ph_sum_35) - (fWith_rf5c_sh_step_tk_36);
-        float fWith_rf5c_sh_step_next_hold_38 = (((fWith_rf5c_sh_step_tk_36) > 0.5f) ? ((fWith_rf5c_chan_driven_32)) : ((st_fRec_fb_rf5c_sh_step_1_M_34)));
-        float fRecNext_rf5c_sh_step_39 = (fWith_rf5c_sh_step_next_ph_37);
-        float fRecNext_rf5c_sh_step_40 = (fWith_rf5c_sh_step_next_hold_38);
-        float fRecOut_rf5c_sh_step_41 = (fWith_rf5c_sh_step_next_hold_38);
-        st_fRec_fb_rf5c_sh_step_0_M_33 = fRecNext_rf5c_sh_step_39;
-        st_fRec_fb_rf5c_sh_step_1_M_34 = fRecNext_rf5c_sh_step_40;
-        float fWith_rf5c_chan_held_42 = (fRecOut_rf5c_sh_step_41);
-        float fWith_rf5c_quant_sign_x_43 = (((fWith_rf5c_chan_held_42) >= 0.0f) ? (1.0f) : (-1.0f));
-        float fWith_rf5c_chan_quant_44 = (((k_mag_levels_13 < 1.0f) ? ((fWith_rf5c_chan_held_42)) : (((sh_fabsf((fWith_rf5c_chan_held_42)) < 1.0e-6f) ? (0.0f) : ((fWith_rf5c_quant_sign_x_43) * sh_fdiv(sh_floorf(sh_minf(1.0f, sh_fabsf((fWith_rf5c_chan_held_42))) * k_mag_levels_13), k_mag_levels_13))))));
-        st_fRec_smoo_M_45 += (k_smoo_a_23) * (((fWith_rf5c_chan_quant_44)) - st_fRec_smoo_M_45);
-        st_fRec_smoo_M_46 += (k_smoo_a_23) * (((st_fRec_smoo_M_45)) - st_fRec_smoo_M_46);
-        float fWith_rf5c_chan_filt_47 = (st_fRec_smoo_M_46);
-        float fWith_rf5c_chan_shaped_48 = ((k_is_raw_tap_25 > 0.5f) ? ((fWith_rf5c_chan_quant_44)) : ((fWith_rf5c_chan_filt_47)));
-        st_fRec_smoo_M_49 += (0.004f) * (((fWith_rf5c_chan_shaped_48)) - st_fRec_smoo_M_49);
-        float fWith_rf5c_chan_out_50 = (fWith_rf5c_chan_shaped_48) - (st_fRec_smoo_M_49);
-        float fWith_process_cR_51 = ((fWith_rf5c_chan_out_50));
-        float fWith_process_mid_52 = 0.5f * ((fWith_process_cL_30) + (fWith_process_cR_51));
-        float fWith_process_side_53 = 0.5f * ((fWith_process_cL_30) - (fWith_process_cR_51));
-        out0 = ((fWith_process_mid_52) + (fWith_process_side_53) * k_st_width_29) * k_out_gain_32;
-        out1 = ((fWith_process_mid_52) - (fWith_process_side_53) * k_st_width_29) * k_out_gain_32;
+        float fSig_sh_rand_7 = sh_lfo_0[i0];
+        float fSig_clk_step_8 = sh_clipf(k_clk_step_base_6 * (1.0f + k_jit_depth_8 * fSig_sh_rand_7), 0.068f, 0.73814f);
+        float fWith_rf5c_sh_step_ph_sum_9 = (st_fRec_fb_rf5c_sh_step_0_M_3) + fSig_clk_step_8;
+        float fWith_rf5c_sh_step_tk_10 = (((fWith_rf5c_sh_step_ph_sum_9) >= 1.0f) ? (1.0f) : (0.0f));
+        float fWith_rf5c_sh_step_next_ph_11 = (fWith_rf5c_sh_step_ph_sum_9) - (fWith_rf5c_sh_step_tk_10);
+        float fWith_rf5c_sh_step_next_hold_12 = (((fWith_rf5c_sh_step_tk_10) > 0.5f) ? ((fWith_rf5c_chan_driven_2)) : ((st_fRec_fb_rf5c_sh_step_1_M_4)));
+        float fRecNext_rf5c_sh_step_13 = (fWith_rf5c_sh_step_next_ph_11);
+        float fRecNext_rf5c_sh_step_14 = (fWith_rf5c_sh_step_next_hold_12);
+        float fRecOut_rf5c_sh_step_15 = (fWith_rf5c_sh_step_next_hold_12);
+        st_fRec_fb_rf5c_sh_step_0_M_3 = fRecNext_rf5c_sh_step_13;
+        st_fRec_fb_rf5c_sh_step_1_M_4 = fRecNext_rf5c_sh_step_14;
+        float fWith_rf5c_chan_held_16 = (fRecOut_rf5c_sh_step_15);
+        float fWith_rf5c_quant_sign_x_17 = (((fWith_rf5c_chan_held_16) >= 0.0f) ? (1.0f) : (-1.0f));
+        float fWith_rf5c_chan_quant_19 = (((k_mag_levels_13 < 1.0f) ? ((fWith_rf5c_chan_held_16)) : (((sh_fabsf((fWith_rf5c_chan_held_16)) < 1.0e-6f) ? (0.0f) : ((fWith_rf5c_quant_sign_x_17) * sh_fdiv(sh_floorf(sh_minf(1.0f, sh_fabsf((fWith_rf5c_chan_held_16))) * k_mag_levels_13), k_mag_levels_13))))));
+        st_fRec_smoo_M_21 += (k_smoo_a_23) * (((fWith_rf5c_chan_quant_19)) - st_fRec_smoo_M_21);
+        st_fRec_smoo_M_22 += (k_smoo_a_23) * (((st_fRec_smoo_M_21)) - st_fRec_smoo_M_22);
+        float fWith_rf5c_chan_filt_23 = (st_fRec_smoo_M_22);
+        float fWith_rf5c_chan_shaped_24 = ((k_is_raw_tap_25 > 0.5f) ? ((fWith_rf5c_chan_quant_19)) : ((fWith_rf5c_chan_filt_23)));
+        st_fRec_smoo_M_25 += (0.004f) * (((fWith_rf5c_chan_shaped_24)) - st_fRec_smoo_M_25);
+        float fWith_rf5c_chan_out_26 = (fWith_rf5c_chan_shaped_24) - (st_fRec_smoo_M_25);
+        float fWith_process_cL_27 = ((fWith_rf5c_chan_out_26));
+        float fWith_zm_soft_clip_xc_28 = sh_clipf(((in1) * k_drv_gain_1), -1.5f, 1.5f);
+        float fWith_rf5c_chan_driven_29 = ((fWith_zm_soft_clip_xc_28) - 0.14814815f * (fWith_zm_soft_clip_xc_28) * (fWith_zm_soft_clip_xc_28) * (fWith_zm_soft_clip_xc_28));
+        float fWith_rf5c_sh_step_ph_sum_32 = (st_fRec_fb_rf5c_sh_step_0_M_30) + fSig_clk_step_8;
+        float fWith_rf5c_sh_step_tk_33 = (((fWith_rf5c_sh_step_ph_sum_32) >= 1.0f) ? (1.0f) : (0.0f));
+        float fWith_rf5c_sh_step_next_ph_34 = (fWith_rf5c_sh_step_ph_sum_32) - (fWith_rf5c_sh_step_tk_33);
+        float fWith_rf5c_sh_step_next_hold_35 = (((fWith_rf5c_sh_step_tk_33) > 0.5f) ? ((fWith_rf5c_chan_driven_29)) : ((st_fRec_fb_rf5c_sh_step_1_M_31)));
+        float fRecNext_rf5c_sh_step_36 = (fWith_rf5c_sh_step_next_ph_34);
+        float fRecNext_rf5c_sh_step_37 = (fWith_rf5c_sh_step_next_hold_35);
+        float fRecOut_rf5c_sh_step_38 = (fWith_rf5c_sh_step_next_hold_35);
+        st_fRec_fb_rf5c_sh_step_0_M_30 = fRecNext_rf5c_sh_step_36;
+        st_fRec_fb_rf5c_sh_step_1_M_31 = fRecNext_rf5c_sh_step_37;
+        float fWith_rf5c_chan_held_39 = (fRecOut_rf5c_sh_step_38);
+        float fWith_rf5c_quant_sign_x_40 = (((fWith_rf5c_chan_held_39) >= 0.0f) ? (1.0f) : (-1.0f));
+        float fWith_rf5c_chan_quant_41 = (((k_mag_levels_13 < 1.0f) ? ((fWith_rf5c_chan_held_39)) : (((sh_fabsf((fWith_rf5c_chan_held_39)) < 1.0e-6f) ? (0.0f) : ((fWith_rf5c_quant_sign_x_40) * sh_fdiv(sh_floorf(sh_minf(1.0f, sh_fabsf((fWith_rf5c_chan_held_39))) * k_mag_levels_13), k_mag_levels_13))))));
+        st_fRec_smoo_M_42 += (k_smoo_a_23) * (((fWith_rf5c_chan_quant_41)) - st_fRec_smoo_M_42);
+        st_fRec_smoo_M_43 += (k_smoo_a_23) * (((st_fRec_smoo_M_42)) - st_fRec_smoo_M_43);
+        float fWith_rf5c_chan_filt_44 = (st_fRec_smoo_M_43);
+        float fWith_rf5c_chan_shaped_45 = ((k_is_raw_tap_25 > 0.5f) ? ((fWith_rf5c_chan_quant_41)) : ((fWith_rf5c_chan_filt_44)));
+        st_fRec_smoo_M_46 += (0.004f) * (((fWith_rf5c_chan_shaped_45)) - st_fRec_smoo_M_46);
+        float fWith_rf5c_chan_out_47 = (fWith_rf5c_chan_shaped_45) - (st_fRec_smoo_M_46);
+        float fWith_process_cR_48 = ((fWith_rf5c_chan_out_47));
+        float fWith_process_mid_49 = 0.5f * ((fWith_process_cL_27) + (fWith_process_cR_48));
+        float fWith_process_side_50 = 0.5f * ((fWith_process_cL_27) - (fWith_process_cR_48));
+        out0 = ((fWith_process_mid_49) + (fWith_process_side_50) * k_st_width_29) * k_out_gain_32;
+        out1 = ((fWith_process_mid_49) - (fWith_process_side_50) * k_st_width_29) * k_out_gain_32;
 
         /* Firmware bypass crossfade & mandatory (-8, +8) output NaN clamp */
         float outL = dryL + fade * (out0 - dryL);
@@ -671,18 +697,18 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     pstate->fRec_fb_rf5c_sh_step_1_M_4 = st_fRec_fb_rf5c_sh_step_1_M_4;
     pstate->fSmoo_5 = st_fSmoo_5;
     pstate->fSmoo_6 = st_fSmoo_6;
-    pstate->iRng_7 = st_iRng_7;
-    pstate->fPulse_M_8 = st_fPulse_M_8;
-    pstate->fLatch_M_9 = st_fLatch_M_9;
-    pstate->fSmoo_21 = st_fSmoo_21;
-    pstate->fSmoo_23 = st_fSmoo_23;
-    pstate->fRec_smoo_M_24 = st_fRec_smoo_M_24;
+    pstate->fSmoo_18 = st_fSmoo_18;
+    pstate->fSmoo_20 = st_fSmoo_20;
+    pstate->fRec_smoo_M_21 = st_fRec_smoo_M_21;
+    pstate->fRec_smoo_M_22 = st_fRec_smoo_M_22;
     pstate->fRec_smoo_M_25 = st_fRec_smoo_M_25;
-    pstate->fRec_smoo_M_28 = st_fRec_smoo_M_28;
-    pstate->fRec_fb_rf5c_sh_step_0_M_33 = st_fRec_fb_rf5c_sh_step_0_M_33;
-    pstate->fRec_fb_rf5c_sh_step_1_M_34 = st_fRec_fb_rf5c_sh_step_1_M_34;
-    pstate->fRec_smoo_M_45 = st_fRec_smoo_M_45;
+    pstate->fRec_fb_rf5c_sh_step_0_M_30 = st_fRec_fb_rf5c_sh_step_0_M_30;
+    pstate->fRec_fb_rf5c_sh_step_1_M_31 = st_fRec_fb_rf5c_sh_step_1_M_31;
+    pstate->fRec_smoo_M_42 = st_fRec_smoo_M_42;
+    pstate->fRec_smoo_M_43 = st_fRec_smoo_M_43;
     pstate->fRec_smoo_M_46 = st_fRec_smoo_M_46;
-    pstate->fRec_smoo_M_49 = st_fRec_smoo_M_49;
-    pstate->fSmoo_54 = st_fSmoo_54;
+    pstate->fSmoo_51 = st_fSmoo_51;
+    pstate->lfo_ph_0 = st_lfo_ph_0;
+    pstate->lfo_rng_0 = st_lfo_rng_0;
+    pstate->lfo_hold_0 = st_lfo_hold_0;
 }

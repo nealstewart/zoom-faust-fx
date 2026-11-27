@@ -6,7 +6,7 @@
   "display": "SCSP RVB",
   "badge": "SC",
   "description": "YMF292 SCSP 44.1 kHz programmable DSP reverb with PACK/UNPACK floating-point delay RAM compression, Hadamard FDN tank, and 5 presets.",
-  "dspload": 20.42,
+  "dspload": 30,
   "kernel": "scsprvb.c",
   "kernel_section": "text",
   "allow_stack": true,

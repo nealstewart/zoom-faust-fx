@@ -6,7 +6,7 @@
   "display": "RF5C FX",
   "badge": "RF",
   "description": "Ricoh RF5C164 8-bit sign-magnitude PCM lo-fi processor with 4-32.55 kHz clock, random S&H clock jitter, and 4 output stages.",
-  "dspload": 11.37,
+  "dspload": 14,
   "kernel": "rf5cfx.c",
   "kernel_section": "text",
   "allow_stack": true,

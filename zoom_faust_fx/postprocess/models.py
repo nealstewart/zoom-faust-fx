@@ -90,6 +90,27 @@ class FaustMemoryReport:
         return "\n".join(lines)
 
 
+DEFAULT_LFO_SYNC_NOTES: List[str] = [
+    "1/32", "1/16", "1/8T", "1/16.", "1/8",
+    "1/4T", "1/8.", "1/4", "1/4.", "1/2",
+]
+
+
+@dataclass
+class LfoSpec:
+    """One stock-style Q31 LFO output buffer generated in Loop 1 (`ctx[9..10]`)."""
+
+    lfo_id: int
+    phase_group_id: int
+    shape: str  # sawpos, saw, trianglepos, triangle, squarewavepos, squarewave, sin, cos, sh
+    buf_name: str
+    rate_param_idx: Optional[int] = None
+    rate_expr: Optional[str] = None
+    phase_offset_u32: int = 0
+    phase_expr: Optional[str] = None
+    phase_is_radians: bool = False
+
+
 @dataclass
 class FaustParam:
     label: str
@@ -103,6 +124,8 @@ class FaustParam:
     unit: str = ""
     values: Optional[List[str]] = None
     time_sync: Optional[dict] = None
+    lfo_sync: Optional[dict] = None
+    is_q31_lfo_rate: bool = False
     scale: str = "linear"
     order: int = 999
 
@@ -110,6 +133,11 @@ class FaustParam:
     def c_macro_name(self) -> str:
         s = re.sub(r"[^A-Za-z0-9]+", "_", self.label.strip()).strip("_").upper()
         return f"SH_PARAM_{s}"
+
+    @property
+    def c_edit_macro_name(self) -> str:
+        s = re.sub(r"[^A-Za-z0-9]", "_", self.label[:12]).upper()
+        return f"SH_EDIT_{s}"
 
     @property
     def is_stock_vol(self) -> bool:
@@ -204,6 +232,7 @@ def parse_faust_dsp_metadata(dsp_text: str) -> Tuple[FaustMeta, List[FaustParam]
         unit = ""
         values = default_values
         time_sync = None
+        lfo_sync = None
         scale = "linear"
         for tag_m in re.finditer(r"\[([^\]]+)\]", raw_label):
             t = tag_m.group(1).strip()
@@ -211,17 +240,18 @@ def parse_faust_dsp_metadata(dsp_text: str) -> Tuple[FaustMeta, List[FaustParam]
                 order = int(t)
             elif ":" in t:
                 tk, tv = [x.strip() for x in t.split(":", 1)]
-                if tk.lower() == "curve":
+                tkl = tk.lower()
+                if tkl == "curve":
                     curve = tv
-                elif tk.lower() == "scale":
+                elif tkl == "scale":
                     scale = tv.lower()
-                elif tk.lower() in ("tooltip", "explanation", "desc"):
+                elif tkl in ("tooltip", "explanation", "desc"):
                     explanation = tv
-                elif tk.lower() == "unit":
+                elif tkl == "unit":
                     unit = tv
-                elif tk.lower() == "values":
+                elif tkl == "values":
                     values = [x.strip()[:7] for x in tv.split("|") if x.strip()]
-                elif tk.lower() == "time_sync":
+                elif tkl == "time_sync":
                     parts = tv.split("..")
                     if len(parts) == 2:
                         time_sync = {
@@ -229,6 +259,48 @@ def parse_faust_dsp_metadata(dsp_text: str) -> Tuple[FaustMeta, List[FaustParam]
                             "max_ms": int(float(parts[1])),
                             "notes": ["1/16", "1/8T", "1/8", "1/4T", "1/8.", "1/4", "1/4."],
                         }
+                elif tkl == "lfo_sync" or (tkl == "zoom" and tv.lower() == "lfo_sync"):
+                    if tkl == "zoom":
+                        min_dhz = max(0, int(round(min_v * 10.0)))
+                        max_dhz = min(999, int(round(max_v * 10.0)))
+                        step_dhz = max(1, int(round(step_v * 10.0))) if step_v > 0 else 1
+                    else:
+                        step_part = None
+                        rng_part = tv
+                        if ":" in tv:
+                            rng_part, step_part = tv.split(":", 1)
+                        parts = rng_part.split("..")
+                        if len(parts) == 2:
+                            min_dhz = max(0, int(round(float(parts[0]) * 10.0)))
+                            max_dhz = min(999, int(round(float(parts[1]) * 10.0)))
+                        else:
+                            min_dhz = max(0, int(round(min_v * 10.0)))
+                            max_dhz = min(999, int(round(max_v * 10.0)))
+                        step_dhz = (
+                            max(1, int(round(float(step_part) * 10.0)))
+                            if step_part is not None
+                            else max(1, int(round(step_v * 10.0))) if step_v > 0 else 1
+                        )
+                    if max_dhz >= min_dhz and (max_dhz - min_dhz) % step_dhz != 0:
+                        max_dhz = min_dhz + ((max_dhz - min_dhz) // step_dhz) * step_dhz
+                    lfo_sync = {
+                        "min_dhz": min_dhz,
+                        "max_dhz": max_dhz,
+                        "step_dhz": step_dhz,
+                        "notes": list(DEFAULT_LFO_SYNC_NOTES),
+                    }
+            elif t.lower() == "lfo_sync":
+                min_dhz = max(0, int(round(min_v * 10.0)))
+                max_dhz = min(999, int(round(max_v * 10.0)))
+                step_dhz = max(1, int(round(step_v * 10.0))) if step_v > 0 else 1
+                if max_dhz >= min_dhz and (max_dhz - min_dhz) % step_dhz != 0:
+                    max_dhz = min_dhz + ((max_dhz - min_dhz) // step_dhz) * step_dhz
+                lfo_sync = {
+                    "min_dhz": min_dhz,
+                    "max_dhz": max_dhz,
+                    "step_dhz": step_dhz,
+                    "notes": list(DEFAULT_LFO_SYNC_NOTES),
+                }
 
         clean_label = re.sub(r"\[[^\]]*\]", "", raw_label).strip()
         if clean_label in seen_labels:
@@ -246,6 +318,8 @@ def parse_faust_dsp_metadata(dsp_text: str) -> Tuple[FaustMeta, List[FaustParam]
             unit=unit,
             values=values,
             time_sync=time_sync,
+            lfo_sync=lfo_sync,
+            is_q31_lfo_rate=bool(lfo_sync),
             scale=scale,
             order=order,
         )

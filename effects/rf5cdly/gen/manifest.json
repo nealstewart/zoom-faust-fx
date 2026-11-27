@@ -11,7 +11,7 @@
   "kernel_section": "text",
   "allow_stack": true,
   "opt_for_space": null,
-  "state_bytes": 188,
+  "state_bytes": 128,
   "scaffold": "cleanroom",
   "params": [
     {
@@ -30,6 +30,7 @@
       "max": 727,
       "default": 300,
       "explanation": "Delay time: 20..740 ms (clicks 0..720), then 1/16..1/4. synced to pedal BPM.",
+      "bpm_sync": true,
       "time_sync": {
         "min_ms": 20,
         "max_ms": 740,
@@ -43,6 +44,12 @@
           "1/4."
         ]
       }
+    },
+    {
+      "name": "Fdbk",
+      "max": 95,
+      "default": 52,
+      "explanation": "Echo feedback repeats (0..95)."
     },
     {
       "name": "Rate",
@@ -86,6 +93,5 @@
       "explanation": "LATCH: normal toggle. UNLATCH: momentary while held."
     }
   ],
-  "footswitch": {},
-  "reads_bpm": true
+  "footswitch": {}
 }

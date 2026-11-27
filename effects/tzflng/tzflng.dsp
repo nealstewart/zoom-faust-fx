@@ -73,7 +73,7 @@ out_trim  = 1.0 / (1.0 + 0.25 * abs(depth_mix) + 0.28 * abs(depth_mix) * abs(fee
 // Micro-drift: 1/f Brownian random walk (`no.lfnoise`) blended with two
 // non-harmonic slow oscillators (0.11 Hz + 0.29 Hz) so the ear never locks
 // onto a periodic guitar-pedal LFO cycle.
-non_periodic_drift = 0.50 * no.lfnoise(0.0035) + 0.30 * os.osc(0.11) + 0.20 * os.osc(0.29);
+non_periodic_drift = 0.50 * no.lfnoise(0.0035) + 0.30 * zm_osc(0.11) + 0.20 * zm_osc(0.29);
 
 mod_delay_smps(x) = 24.0 + 360.0 * (m_clamped * m_clamped)
     with {

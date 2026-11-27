@@ -6,7 +6,7 @@
   "display": "YM2612",
   "badge": "YM",
   "description": "16-bit FM-era YM2612 9-bit ladder DAC, Z80 PCM rate/jitter, and analog output stage emulator.",
-  "dspload": 17.95,
+  "dspload": 20,
   "kernel": "ym2612.c",
   "kernel_section": "text",
   "allow_stack": true,

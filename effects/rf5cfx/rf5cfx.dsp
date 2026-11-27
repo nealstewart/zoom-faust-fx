@@ -67,10 +67,10 @@ drv_gain = 1.0 + drive_knob * (2.2 + 4.0 * drive_knob);
 drv_comp = 1.0 / (1.0 + drive_knob * 1.55);
 out_gain = level_knob * drv_comp;
 
-// ---- 3. Random Sample & Hold (`ba.latch` + `no.noise`) Clock Jitter ----
+// ---- 3. Random Sample & Hold (`zm_lf_sh(200.0)` in Q31 Loop 1) Clock Jitter ----
 // Shared across L/R (single RF5C164 clock domain on hardware).
 // At ClkJit=0, jit_depth=0 -> crystal-locked clock.
-sh_rand  = ba.latch(ba.pulse(220.0), no.noise);
+sh_rand  = zm_lf_sh(200.0);
 clk_step = aa.clip(0.068, 0.73814, clk_step_base * (1.0 + jit_depth * sh_rand));
 
 // ---- 4. Ricoh RF5C164 ZOH Sample-and-Hold + Sign-Magnitude Quantizer ----

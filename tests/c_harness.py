@@ -241,16 +241,22 @@ def synthesize_sh_params_h(manifest: dict) -> str:
 
     free_slots = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
     param_defines = []
+    edit_c_defines = []
     slot_idx = 0
-    for p in manifest.get("params", []):
+    for idx, p in enumerate(manifest.get("params", [])):
         p_name = p["name"]
         macro = "SH_PARAM_" + re.sub(r"[^A-Za-z0-9]+", "_", p_name.strip()).strip("_").upper()
         slot = p.get("slot", free_slots[slot_idx])
         slot_idx += 1
         param_defines.append(f"#define {macro} {slot}")
+        k = idx + 2
+        emacro = "SH_EDIT_" + re.sub(r"[^A-Za-z0-9]", "_", p_name).upper()
+        edit_c_defines.append(f"#define {emacro} Aw_P{k}_edit_c")
+        edit_c_defines.append(f"void Aw_P{k}_edit_c(int click, float *coeff, void **ctx, int slot);")
 
     return f"""#ifndef SH_PARAMS_H
 #define SH_PARAMS_H
+#include <stdint.h>
 
 #define SH_AUDIO_FN {fn_name}
 void {fn_name}(void **instance, void **ctx);
@@ -258,7 +264,6 @@ void {fn_name}(void **instance, void **ctx);
 #define SH_FRAMES        16
 #define SH_CH_B_OFFSET   16
 #define SH_COEFF_BYPASS  0
-#define SH_COEFF_BPM     15
 #define SH_CTX_GTRIN     0
 #define SH_CTX_EFF       1
 #define SH_CTX_OUT       2
@@ -270,6 +275,45 @@ void {fn_name}(void **instance, void **ctx);
 #define SH_STATE_GUARD_WORD  {guard_word}
 #define SH_NUM_PARAMS    {len(param_defines)}
 {chr(10).join(param_defines)}
+
+typedef int (*sh_note_to_ms_fn)(int note_idx, int max_ms);
+
+static inline int sh_note_to_ms(void **ctx, int note_idx, int max_ms) {{
+    sh_note_to_ms_fn fn = ctx ? (sh_note_to_ms_fn)ctx[34] : (sh_note_to_ms_fn)0;
+    if (!fn) return 0;
+    int ms = fn(note_idx, max_ms);
+    return (ms > 0 && ms <= max_ms) ? ms : 0;
+}}
+
+typedef void (*sh_ramp_f32_fn)(float *dest, float target, float rate);
+typedef void (*sh_ramp_i32_fn)(int32_t *dest, int32_t target, int32_t rate);
+
+static inline void sh_ramp_f32(void **ctx, float *dest, float target, float rate) {{
+    sh_ramp_f32_fn fn = ctx ? (sh_ramp_f32_fn)ctx[3] : (sh_ramp_f32_fn)0;
+    if (fn) fn(dest, target, rate); else *dest = target;
+}}
+
+static inline void sh_smooth_f32(void **ctx, float *dest, float target, float rate) {{
+    sh_ramp_f32_fn fn = ctx ? (sh_ramp_f32_fn)ctx[4] : (sh_ramp_f32_fn)0;
+    if (fn) fn(dest, target, rate); else *dest = target;
+}}
+
+static inline void sh_ramp_i32(void **ctx, int32_t *dest, int32_t target, int32_t rate) {{
+    sh_ramp_i32_fn fn = ctx ? (sh_ramp_i32_fn)ctx[5] : (sh_ramp_i32_fn)0;
+    if (fn) fn(dest, target, rate); else *dest = target;
+}}
+
+static inline void sh_smooth_i32(void **ctx, int32_t *dest, int32_t target, int32_t rate) {{
+    sh_ramp_i32_fn fn = ctx ? (sh_ramp_i32_fn)ctx[6] : (sh_ramp_i32_fn)0;
+    if (fn) fn(dest, target, rate); else *dest = target;
+}}
+
+#define SH_BIND_EDIT(target, fn) \\
+    void target(int click, float *coeff, void **ctx, int slot) {{ \\
+        fn(click, coeff, ctx, slot); \\
+    }}
+
+{chr(10).join(edit_c_defines)}
 
 #endif
 """
@@ -320,7 +364,10 @@ class KernelHarness:
         self.dd = (ctypes.c_uint32 * 3)()
 
         self.instance = (ctypes.c_void_p * 4)()
-        self.ctx = (ctypes.c_void_p * 9)()
+        self.ctx = (ctypes.c_void_p * 45)()
+        self.lfo_ramp_sink = ctypes.c_int32(0)
+        self.lfo_ramp_dst = ctypes.c_void_p(ctypes.addressof(self.lfo_ramp_sink))
+        self.lfo_ramp_buf = (ctypes.c_int32 * 16)()
 
         self.param_slots: Dict[str, int] = {}
         self.reset()
@@ -336,18 +383,30 @@ class KernelHarness:
 
         free_slots = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
         slot_idx = 0
+        icoef_view = ctypes.cast(self.coef, ctypes.POINTER(ctypes.c_int32))
         for p in self.manifest.get("params", []):
             slot = p.get("slot", free_slots[slot_idx])
             slot_idx += 1
             self.param_slots[p["name"]] = slot
             p_max = p.get("max", len(p["values"]) - 1 if "values" in p else 100)
             p_def = p.get("default", 0)
-            if p.get("curve") == "stock_vol":
+            if p.get("q31_default") is not None:
+                icoef_view[slot] = int(p["q31_default"])
+            elif p.get("lfo_sync"):
+                ls = p["lfo_sync"]
+                min_dhz = int(ls["min_dhz"])
+                max_dhz = int(ls["max_dhz"])
+                step_dhz = int(ls.get("step_dhz", 1))
+                hz_max_click = (max_dhz - min_dhz) // step_dhz
+                hz = (min_dhz + p_def * step_dhz) * 0.1 if p_def <= hz_max_click else 2.0
+                icoef_view[slot] = int(round(hz * 97391.548))
+            elif p.get("curve") == "stock_vol":
                 # Stock VOL curve: v/80 for v <= 80, 1 + (v-80)/40 above
                 val = (p_def / 80.0) if p_def <= 80 else (1.0 + (p_def - 80.0) / 40.0)
+                self.coef[slot] = val
             else:
                 val = (p_def / float(p_max)) if p_max > 0 else 0.0
-            self.coef[slot] = val
+                self.coef[slot] = val
 
         self.sdram.zero()
         self.dd[0] = self.sdram.base_addr
@@ -360,8 +419,11 @@ class KernelHarness:
         self.instance[3] = ctypes.cast(self.dd, ctypes.c_void_p)
 
         ctypes.memset(self.ctx, 0, ctypes.sizeof(self.ctx))
+        ctypes.memset(self.lfo_ramp_buf, 0, ctypes.sizeof(self.lfo_ramp_buf))
         self.ctx[0] = ctypes.cast(self.gtrin, ctypes.c_void_p)
         self.ctx[1] = ctypes.cast(self.eff, ctypes.c_void_p)
+        self.ctx[9] = ctypes.cast(ctypes.byref(self.lfo_ramp_dst), ctypes.c_void_p)
+        self.ctx[10] = ctypes.cast(self.lfo_ramp_buf, ctypes.c_void_p)
 
     def set_param_norm(self, name: str, norm_val: float) -> None:
         self.coef[self.param_slots[name]] = norm_val

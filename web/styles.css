@@ -147,6 +147,8 @@ button, input, select {
   cursor: pointer;
   flex-shrink: 0;
   box-shadow: inset 0 2px 8px rgba(0, 56, 32, 0.35), 0 1px 0 rgba(255, 255, 255, 0.35);
+  contain: layout paint;
+  transform: translateZ(0);
 }
 
 .scope-box canvas {
@@ -198,13 +200,17 @@ button, input, select {
   border-radius: 3px;
   overflow: hidden;
   border: 1px solid #063963;
+  contain: layout paint;
 }
 
 .meter-fill {
   height: 100%;
-  width: 0%;
+  width: 100%;
   background: linear-gradient(90deg, #12f094 0%, #facc15 72%, #ff5a1f 95%);
-  transition: width 40ms linear;
+  transform-origin: left center;
+  transform: scaleX(0);
+  will-change: transform;
+  transition: transform 40ms linear;
 }
 
 .mini-slider {
@@ -463,42 +469,67 @@ button, input, select {
   background: rgba(34, 197, 94, 0.08);
 }
 
-/* Mini Keyboard */
+/* Mini Keyboard — Recessed Hardware Keybed */
 .mini-keyboard {
-  display: flex;
-  align-items: stretch;
-  height: 30px;
+  display: inline-flex;
+  align-items: flex-start;
+  height: 44px;
+  padding: 3px;
   gap: 2px;
+  background: #141a22;
+  border: 1.5px solid #0b1119;
+  border-radius: 7px;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.45);
 }
 
 .key-btn {
-  width: 24px;
-  border-radius: 4px;
-  border: 1px solid var(--border-hi);
-  background: #e2e8f0;
-  color: #0f172a;
+  width: 22px;
+  height: 100%;
+  border-radius: 2px 2px 4px 4px;
+  border: 1px solid #cbd5e1;
+  border-top: none;
+  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+  color: #475569;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   cursor: pointer;
   display: grid;
   place-items: end center;
-  padding-bottom: 2px;
+  padding: 0 0 3px 0;
   touch-action: none;
   -webkit-touch-callout: none;
+  box-shadow: inset 0 -2px 0 rgba(15, 23, 42, 0.14);
+  transition: background 0.06s, transform 0.05s, color 0.06s;
+}
+
+.key-btn:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #dbeafe 100%);
+  color: #0c1f33;
 }
 
 .key-btn.black {
-  background: #1e293b;
+  background: linear-gradient(180deg, #334155 0%, #0f172a 100%);
   color: #94a3b8;
-  border-color: #334155;
-  width: 20px;
+  border-color: #020617;
+  width: 18px;
+  height: 64%;
+  border-radius: 2px 2px 3px 3px;
+  padding-bottom: 2px;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.key-btn.black:hover {
+  background: linear-gradient(180deg, #475569 0%, #1e293b 100%);
+  color: #e2e8f0;
 }
 
 .key-btn.pressed {
-  background: var(--accent);
-  color: #04111a;
-  border-color: #7dd3fc;
+  background: var(--lcd-bg);
+  color: var(--lcd-text);
+  border-color: #065f46;
+  box-shadow: 0 0 8px rgba(18, 240, 148, 0.55);
+  transform: translateY(1px);
 }
 
 /* Workspace */
@@ -727,19 +758,61 @@ button, input, select {
   border-right: 1px solid var(--border);
 }
 
+/* Synth Controls — Compact Desktop Strip */
+#panel-synth {
+  column-gap: 10px;
+  row-gap: 6px;
+}
+
+.synth-selects {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.synth-selects .select-input {
+  height: 32px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+}
+
+#panel-synth .synth-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#autoRiffBtn {
+  height: 32px;
+  padding: 0 11px;
+}
+
+#acidRandBtn {
+  height: 32px;
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+
 .synth-knobs-group {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-inline: auto;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 3px 10px;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 2px rgba(12, 31, 51, 0.08);
 }
 
 .acid-env-group {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding-left: 6px;
+  border-left: 1px solid var(--border);
 }
 
 .acid-env-group[hidden] {
@@ -750,17 +823,23 @@ button, input, select {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  min-width: 56px;
+  gap: 1px;
+  min-width: 40px;
   user-select: none;
 }
 
 .mini-knob-label {
-  font-size: 10px;
+  font-size: 8.5px;
   font-weight: 800;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.45px;
   color: var(--text-dim);
   line-height: 1;
+}
+
+.synth-knobs-group .mini-knob-wrap,
+.synth-knobs-group .mini-knob-svg {
+  width: 32px;
+  height: 32px;
 }
 
 .mini-knob-wrap {
@@ -769,8 +848,9 @@ button, input, select {
 }
 
 .mini-knob-val {
-  font-size: 10px;
-  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text);
   line-height: 1;
 }
 
@@ -1197,7 +1277,6 @@ button, input, select {
 
 /* Desktop pass-through wrappers so mobile grouping doesn't affect desktop layout */
 .topbar-head,
-.synth-primary,
 .synth-extras {
   display: contents;
 }
@@ -1390,7 +1469,7 @@ button, input, select {
     gap: 10px;
   }
 
-  .synth-primary {
+  #panel-synth .synth-primary {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1399,49 +1478,100 @@ button, input, select {
 
   #autoRiffBtn {
     flex: 1 1 auto;
-    min-height: 48px;
-    font-size: 15px;
+    height: auto;
+    min-height: 44px;
+    font-size: 14px;
     justify-content: center;
-    border-radius: 10px;
+    border-radius: 9px;
   }
 
   #acidRandBtn {
-    min-width: 48px;
-    min-height: 48px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     justify-content: center;
-    font-size: 18px;
-    border-radius: 10px;
+    font-size: 17px;
+    border-radius: 9px;
   }
 
   #toggleSynthExtrasBtn {
-    min-height: 48px;
-    padding: 0 14px;
+    min-height: 44px;
+    padding: 0 13px;
     font-size: 13px;
-    border-radius: 10px;
+    border-radius: 9px;
   }
 
-  /* Secondary synth controls collapsed by default on mobile */
+  /* Secondary synth controls — cohesive recessed drawer on mobile */
   .synth-extras {
     display: none;
     width: 100%;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
     gap: 10px;
-    padding-top: 6px;
-    border-top: 1px solid var(--border);
+    padding: 10px;
+    background: var(--bg-0);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: inset 0 1px 3px rgba(12, 31, 51, 0.08);
   }
 
   .synth-extras.open {
     display: flex;
   }
 
+  .synth-selects {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    width: 100%;
+  }
+
+  .synth-selects .select-input {
+    width: 100%;
+    height: auto;
+    min-height: 40px;
+    padding: 6px 10px;
+    border-radius: 8px;
+  }
+
   .synth-knobs-group {
     width: 100%;
-    justify-content: center;
-    gap: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-evenly;
+    flex-wrap: nowrap;
+    gap: 4px;
+    padding: 8px 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
   }
 
   .acid-env-group {
-    gap: 10px;
+    display: contents;
+    padding-left: 0;
+    border-left: none;
+  }
+
+  .synth-knobs-group .mini-knob-slot {
+    flex: 1 1 0;
+    min-width: 0;
+    gap: 3px;
+  }
+
+  .synth-knobs-group .mini-knob-label {
+    font-size: 9.5px;
+  }
+
+  .synth-knobs-group .mini-knob-val {
+    font-size: 10px;
+  }
+
+  .synth-knobs-group .mini-knob-wrap,
+  .synth-knobs-group .mini-knob-svg {
+    width: 46px;
+    height: 46px;
   }
 
   .source-panel .select-input {
@@ -1494,24 +1624,29 @@ button, input, select {
     background: rgba(245, 158, 11, 0.1);
   }
 
-  /* Touch-friendly mini keyboard */
+  /* Touch-friendly recessed mini keyboard */
   .mini-keyboard {
+    display: flex;
     width: 100%;
-    height: 52px;
+    height: 58px;
+    padding: 4px;
     gap: 3px;
+    border-radius: 9px;
   }
 
   .key-btn {
     flex: 1 1 0;
     width: auto;
-    min-width: 20px;
+    min-width: 18px;
     font-size: 10px;
     padding-bottom: 5px;
   }
 
   .key-btn.black {
-    flex: 0.85 1 0;
+    flex: 0.82 1 0;
     width: auto;
+    height: 62%;
+    padding-bottom: 4px;
   }
 
   /* Prevent iOS Safari auto-zoom on input/select focus */

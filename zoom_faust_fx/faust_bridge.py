@@ -82,6 +82,27 @@ def _rewrite_wavetable_oscs(dsp_text: str) -> str:
         )
     if re.search(r"\bzm_bpm\b", out):
         out = re.sub(r"\bzm_bpm\b", 'hslider("__zm_bpm__", 120.0, 30.0, 300.0, 0.1)', out)
+    # Redirect zoom.lib Q31 LFO primitives to audio-rate ffunction markers for c_backend Loop 1
+    if re.search(
+        r"\bzm_(?:lf_sawpos|lf_sawpos_phase|lf_saw|lf_trianglepos|lf_triangle"
+        r"|lf_squarewavepos|lf_squarewave|osc|osccos|oscp|quadosc|triosc|lf_sh|lfo_sync_hz)\b",
+        out,
+    ):
+        lfo_overrides = """
+zm_lf_sawpos(f)          = ffunction(float __sh_lfo_sawpos(float, int), "", "")(f, ba.time);
+zm_lf_sawpos_phase(f, p) = ffunction(float __sh_lfo_sawpos_phase(float, float, int), "", "")(f, p, ba.time);
+zm_lf_saw(f)             = ffunction(float __sh_lfo_saw(float, int), "", "")(f, ba.time);
+zm_lf_trianglepos(f)     = ffunction(float __sh_lfo_trianglepos(float, int), "", "")(f, ba.time);
+zm_lf_triangle(f)        = ffunction(float __sh_lfo_triangle(float, int), "", "")(f, ba.time);
+zm_lf_squarewavepos(f)   = ffunction(float __sh_lfo_squarewavepos(float, int), "", "")(f, ba.time);
+zm_lf_squarewave(f)      = ffunction(float __sh_lfo_squarewave(float, int), "", "")(f, ba.time);
+zm_osc(f)                = ffunction(float __sh_lfo_osc(float, int), "", "")(f, ba.time);
+zm_osccos(f)             = ffunction(float __sh_lfo_osccos(float, int), "", "")(f, ba.time);
+zm_oscp(f, p)            = ffunction(float __sh_lfo_oscp(float, float, int), "", "")(f, p, ba.time);
+zm_lf_sh(f)              = ffunction(float __sh_lfo_sh(float, int), "", "")(f, ba.time);
+zm_lfo_sync_hz(c, a, b, s, bpm) = c;
+"""
+        out = out + "\n" + lfo_overrides
     return out
 
 

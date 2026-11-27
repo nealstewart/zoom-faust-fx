@@ -80,7 +80,7 @@ out_gain    = 0.5 * level_knob * drv_comp;
 
 // ---- 3. Z80 / 68000 DMA Bus Contention Clock Jitter Modulator ----
 // Shared across L/R (single YM2612 + Z80 clock domain on real hardware!)
-dma_jit_sig = 0.45 * os.osc(59.92) + 0.30 * os.osc(217.3) + 0.25 * zm_ema(0.18, no.noise);
+dma_jit_sig = 0.45 * zm_osc(59.92) + 0.30 * zm_osc(217.3) + 0.25 * zm_ema(0.18, no.noise);
 step_jit    = aa.clip(0.045, 1.0, eff_rate * (1.0 + jit_depth * dma_jit_sig));
 
 // ---- 4. YM2612 ZOH Sample-and-Hold + 9-Bit Quantizer + Ladder Effect ----

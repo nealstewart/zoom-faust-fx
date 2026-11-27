@@ -24,6 +24,7 @@ declare description "Clean-room FAUST Hellektro Octave/Ring-Mod Fuzz: full-wave 
 declare zd2_dspload "26";
 
 import("stdfaust.lib");
+import("zoom.lib");
 
 // ---- 6 Knobs (matching effects/octring/manifest.json) ----
 fuzz_knob  = hslider("Fuzz[1][tooltip:Gated velcro fuzz drive (0..100).]", 60, 0, 100, 1) * 0.01 : si.smoo;
@@ -88,7 +89,7 @@ octring_channel(x_hp) =
         g_thresh  = 0.002 + 0.0014 * temp;
         g_open    = aa.clip(0.0, 1.0, (gate_env - g_thresh) * 100.0);
         x_oct     = fullwave_oct(x_hp);
-        ring_mod  = dry_ring + ring_knob * os.osc(freq_hz);
+        ring_mod  = dry_ring + ring_knob * zm_osc(freq_hz);
         gain_t    = base_gain * (1.0 - 0.173 * temp + 0.171 * drift + 0.019 * white);
         asym_t    = (0.74 * temp + 0.18 * drift) * fuzz_knob;
         pos_lim_t = max(0.25, 0.90 * (1.0 - 0.58 * temp + 0.07 * drift));

@@ -31,6 +31,7 @@
       "max": 667,
       "default": 665,
       "explanation": "Delay time: 40..700 ms (clicks 0..660), then 1/16..1/4. synced to pedal BPM (665 = 1/8.).",
+      "bpm_sync": true,
       "time_sync": {
         "min_ms": 40,
         "max_ms": 700,
@@ -87,6 +88,5 @@
       "explanation": "Master stereo output level (80 is unity).",
       "curve": "stock_vol"
     }
-  ],
-  "reads_bpm": true
+  ]
 }

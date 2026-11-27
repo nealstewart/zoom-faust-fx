@@ -6,12 +6,12 @@
   "display": "XA SPU",
   "badge": "XA",
   "description": "32-bit era 4-bit XA ADPCM codec and 4-point Gaussian DAC interpolator lo-fi processor.",
-  "dspload": 16.1,
+  "dspload": 23,
   "kernel": "xaspu.c",
   "kernel_section": "text",
   "allow_stack": true,
   "opt_for_space": null,
-  "state_bytes": 112,
+  "state_bytes": 120,
   "scaffold": "cleanroom",
   "params": [
     {

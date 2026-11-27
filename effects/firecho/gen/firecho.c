@@ -435,6 +435,13 @@ typedef struct {
     uint32_t init_magic;
 } faust_zd2_state_t;
 
+void SH_EDIT_TIME(int click, float *coeff, void **ctx, int slot)
+{
+    coeff[slot] = (float)click * (1.0f / 687.0f);
+    int qtr_ms = sh_note_to_ms(ctx, 6, 4000);
+    if (qtr_ms > 0) coeff[15] = (float)qtr_ms;
+}
+
 void SH_AUDIO_FN(void **instance, void **ctx)
 {
     int i0;
@@ -535,7 +542,7 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     float fHslider3 = 0.000000f + raw_p3 * 100.000000f;
     float fHslider4 = 0.000000f + raw_p4 * 100.000000f;
     float fHslider5 = raw_p5;
-    float host_qtr_ms = coef[SH_COEFF_BPM];
+    float host_qtr_ms = coef[15];
     if (!(host_qtr_ms >= 150.0f && host_qtr_ms <= 2000.0f)) host_qtr_ms = 500.0f;
     float host_bpm = sh_fdiv(60000.0f, host_qtr_ms);
 

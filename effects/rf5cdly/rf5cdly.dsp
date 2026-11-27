@@ -71,9 +71,9 @@ rf5c_quant(x) = ba.if(mag_levels < 1.0, x,
         sign_x = ba.if(x >= 0.0, 1.0, -1.0);
     };
 
-// Random Sample & Hold (`ba.latch` + `no.noise`) for RF5C164 clock jitter:
-// Stepped at ~200 Hz (220 samples @ 44.1 kHz); at ClkJit=0, clk_step is crystal-locked.
-sh_rand  = ba.latch(ba.pulse(220.0), no.noise);
+// Random Sample & Hold (`zm_lf_sh(200.0)` in Q31 Loop 1) for RF5C164 clock jitter:
+// Stepped at ~200 Hz (~220 samples @ 44.1 kHz); at ClkJit=0, clk_step is crystal-locked.
+sh_rand  = zm_lf_sh(200.0);
 clk_step = aa.clip(0.068, 0.73814, clk_step_base * (1.0 + jit_depth * sh_rand));
 tap_jit  = zm_ema(0.015, sh_rand) * tap_jit_amt;
 

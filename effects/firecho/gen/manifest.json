@@ -30,6 +30,7 @@
       "max": 687,
       "default": 300,
       "explanation": "Echo time: 20..700 ms (clicks 0..680), then 1/16..1/4. synced to pedal BPM.",
+      "bpm_sync": true,
       "time_sync": {
         "min_ms": 20,
         "max_ms": 700,
@@ -81,6 +82,5 @@
       "explanation": "LATCH: normal toggle. UNLATCH: momentary while held."
     }
   ],
-  "footswitch": {},
-  "reads_bpm": true
+  "footswitch": {}
 }

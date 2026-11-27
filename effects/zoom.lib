@@ -127,9 +127,47 @@ zm_svf_lp(fc, q, x)   = fi.svf.lp(fc, q, x);
 zm_svf_hp(fc, q, x)   = fi.svf.hp(fc, q, x);
 zm_svf_peak(fc, q, x) = fi.svf.peak(fc, q, x);
 
-// Wavetable-free sine/cosine oscillators (0 KB SDRAM, uses sh_sinf/sh_cosf on C674x)
-zm_osc(f)    = sin(2.0 * ma.PI * os.phasor(1.0, f));
-zm_osccos(f) = cos(2.0 * ma.PI * os.phasor(1.0, f));
+// Wavetable-free sine/cosine oscillators & stock-style Q31 LFOs (0 KB SDRAM).
+// In standard desktop/WASM FAUST these expand directly to `os.*` primitives;
+// in `zoom-faust-fx` C674x builds they lower into a stock-style two-loop Q31
+// LFO generator (Loop 1 streaming `ctx[9..10]`, Loop 2 audio) with zero LUTs
+// and automatic phase sharing across LFOs driven by the same `rate` signal.
+zm_lf_sawpos(f)          = os.lf_sawpos(f);
+zm_lf_sawpos_phase(f, p) = os.lf_sawpos_phase(f, p);
+zm_lf_saw(f)             = os.lf_saw(f);
+zm_lf_trianglepos(f)     = os.lf_trianglepos(f);
+zm_lf_triangle(f)        = os.lf_triangle(f);
+zm_lf_squarewavepos(f)   = os.lf_squarewavepos(f);
+zm_lf_squarewave(f)      = os.lf_squarewave(f);
+zm_osc(f)                = sin(2.0 * ma.PI * os.phasor(1.0, f));
+zm_osccos(f)             = cos(2.0 * ma.PI * os.phasor(1.0, f));
+zm_oscp(f, p)            = sin(2.0 * ma.PI * os.phasor(1.0, f) + p);
+zm_quadosc(f)            = zm_osc(f), zm_osccos(f);
+zm_triosc(f)             = zm_oscp(f, 0.0), zm_oscp(f, 2.0943951), zm_oscp(f, 4.1887902);
+zm_osc_spread(f, spread) = zm_osc(f), zm_oscp(f, spread * ma.PI);
+zm_quad4(f)              = s, c, 0.0 - s, 0.0 - c with { s = zm_osc(f); c = zm_osccos(f); };
+zm_lf_sh(f)              = no.noise : ba.latch(os.lf_imptrain(f));
+
+// Single-knob Zoom-style LFO Rate parameter (`[lfo_sync:min_hz..max_hz]` or `[zoom:lfo_sync]`):
+//   - clicks `0 .. hz_max_click`: free-running Hz (`min_hz .. max_hz` in `step_hz` increments)
+//   - upper clicks: BPM-synced note subdivisions (1/32, 1/16, 1/8T, 1/16., 1/8, 1/4T, 1/8., 1/4, 1/4., 1/2)
+zm_lfo_sync_hz(raw_click, min_hz, max_hz, step_hz, bpm) =
+    ba.if(raw_click <= hz_max_click + 0.5, free_hz, note_hz)
+    with {
+        hz_max_click = (max_hz - min_hz) / step_hz;
+        free_hz      = min_hz + raw_click * step_hz;
+        note_idx     = int(min(9.0, max(0.0, floor(raw_click - hz_max_click - 0.5))));
+        beats        = ba.if(note_idx < 0.5, 0.125,
+                       ba.if(note_idx < 1.5, 0.25,
+                       ba.if(note_idx < 2.5, 0.3333333,
+                       ba.if(note_idx < 3.5, 0.375,
+                       ba.if(note_idx < 4.5, 0.5,
+                       ba.if(note_idx < 5.5, 0.6666667,
+                       ba.if(note_idx < 6.5, 0.75,
+                       ba.if(note_idx < 7.5, 1.0,
+                       ba.if(note_idx < 8.5, 1.5, 2.0)))))))));
+        note_hz      = bpm / (60.0 * beats);
+    };
 
 // Zoom-sized stereo Schroeder/Freeverb-style reverb (fits < 529 KB SDRAM & C674x budget).
 // Parameters: room in [0, 1], damp in [0, 1], width in [0, 1] (unused/reserved).

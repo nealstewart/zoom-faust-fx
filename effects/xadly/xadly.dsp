@@ -97,8 +97,8 @@ spu_grit(x) = sat + q_blend * (crushed - sat)
     };
 
 // ---- 4. Dual-Rate Quadrature BBD LFO ----
-lfo_a = os.osc(0.43);
-lfo_b = os.osc(0.61);
+lfo_a = zm_osc(0.43);
+lfo_b = zm_osc(0.61);
 mod_l = (0.65 * lfo_a + 0.35 * lfo_b) * mod_smps;
 mod_r = (-0.65 * lfo_a + 0.35 * lfo_b) * mod_smps;
 

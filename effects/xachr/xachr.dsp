@@ -33,7 +33,7 @@ import("zoom.lib");
 
 // ---- 7 Knobs + Trailing Footswitch Toggle (2 Pages of 4 on Zoom MS-70CDR+) ----
 mode_sel   = hslider("Mode[1][values:DUAL|TRIO|NEGV|VBLNK][tooltip:PS1 chorus voicing (DUAL = 2-voice stereo, TRIO = 3-voice ensemble, NEGV = SPU negative-volume wide stereo, VBLNK = 60Hz stepped pitch LFO).]", 1, 0, 3, 1);
-rate_knob  = hslider("Rate[2][tooltip:Modulation speed (0.10..5.50 Hz).]", 24, 0, 100, 1) * 0.01 : si.smoo;
+rate_hz    = hslider("Rate[2][zoom:lfo_sync][tooltip:Modulation speed (0.1..5.5 Hz, then 1/32..1/2 synced to pedal BPM).]", 0.4, 0.1, 5.5, 0.1);
 depth_knob = hslider("Depth[3][tooltip:Chorus pitch/delay sweep depth (0..100%).]", 55, 0, 100, 1) * 0.01 : si.smoo;
 delay_knob = hslider("Delay[4][tooltip:Base voice delay offset (4..24 ms; tight doubler to wide ensemble).]", 35, 0, 100, 1) * 0.01 : si.smoo;
 tone_knob  = hslider("Tone[5][tooltip:PS1 4-point Gaussian interpolation darkening (0 = bright, 100 = warm hazy 90s ROMpler).]", 45, 0, 100, 1) * 0.01 : si.smoo;
@@ -56,8 +56,6 @@ tone_bias = sel4(mode_sel, 0.00, 0.05, 0.05, 0.22);
 is_vblnk  = ba.if(mode_sel > 2.5, 1.0, 0.0);
 
 // ---- 2. Block-Rate Coefficients ----
-// Perceptual exponential LFO rate: 0.12 Hz .. 5.2 Hz
-lfo_hz    = 0.12 + rate_knob * rate_knob * 5.08;
 // Base voice delay in samples (4..24 ms -> 176..1058 samples)
 base_smps = 176.0 + delay_knob * 882.0;
 // Sweep depth in samples (up to ~240 samples = ~5.4 ms)
@@ -71,9 +69,9 @@ dry_gain  = sqrt(max(0.0, 1.0 - mix_knob));
 wet_gain  = sqrt(max(0.0, mix_knob));
 
 // ---- 3. Tri-Phase LFOs (0, 120, 240 deg) + Optional 60 Hz VBlank Stepped Quantization ----
-// Construct 120-degree and 240-degree phase-shifted sines from sin/cos pair
-s0 = os.osc(lfo_hz);
-c0 = os.osccos(lfo_hz);
+// Construct 120-degree and 240-degree phase-shifted sines from shared Q31 Loop 1 sin/cos pair
+s0 = zm_osc(rate_hz);
+c0 = zm_osccos(rate_hz);
 lfo1_raw = s0;
 lfo2_raw = -0.5 * s0 + 0.8660254 * c0;
 lfo3_raw = -0.5 * s0 - 0.8660254 * c0;

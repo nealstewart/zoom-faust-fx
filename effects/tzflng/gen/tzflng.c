@@ -406,6 +406,16 @@ static inline float sh_coshf(float x)
     return 0.5f * (e + sh_rcp_pos(e));
 }
 
+/* Faust 2.88+ C-backend inline integer & power helpers */
+static inline int faust_wrap_add(int a, int b) { return a + b; }
+static inline int faust_wrap_sub(int a, int b) { return a - b; }
+static inline int faust_wrap_mul(int a, int b) { return a * b; }
+static inline int faustmaxi(int a, int b) { return (a > b) ? a : b; }
+static inline int faustmini(int a, int b) { return (a < b) ? a : b; }
+static inline float mydsp_faustpower2_f(float x) { return x * x; }
+static inline float mydsp_faustpower3_f(float x) { return x * x * x; }
+static inline float mydsp_faustpower4_f(float x) { float x2 = x * x; return x2 * x2; }
+
 
 /* Persistent FAUST DSP state mapped directly onto instance[2] (zero stack copy!) */
 typedef struct {
@@ -413,19 +423,19 @@ typedef struct {
     float fEnv_M_3;
     float fSmoo_5;
     float fSmoo_7;
-    float fOsc_ph_M_8;
-    float fOsc_ph_M_9;
-    uint32_t iRng_10;
-    float fDrift_11;
-    float fSmoo_14;
-    float fRec_hp1_M_17;
-    float fRec_lp1_M_19;
-    float fRec_fb_flanger_tank_step_M_21;
-    float fRec_lp1_M_24;
+    uint32_t iRng_8;
+    float fDrift_9;
+    float fSmoo_12;
+    float fRec_hp1_M_15;
+    float fRec_lp1_M_17;
+    float fRec_fb_flanger_tank_step_M_19;
+    float fRec_lp1_M_22;
+    float fTf1_z1_M_24;
     float fTf1_z1_M_26;
-    float fTf1_z1_M_28;
-    float fSmoo_30;
-    float fSmoo_38;
+    float fSmoo_28;
+    float fSmoo_36;
+    uint32_t lfo_ph_0;
+    uint32_t lfo_ph_1;
     uint32_t init_magic;
 } faust_zd2_state_t;
 
@@ -494,34 +504,32 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     float st_fEnv_M_3 = pstate->fEnv_M_3;
     float st_fSmoo_5 = pstate->fSmoo_5;
     float st_fSmoo_7 = pstate->fSmoo_7;
-    float st_fOsc_ph_M_8 = pstate->fOsc_ph_M_8;
-    float st_fOsc_ph_M_9 = pstate->fOsc_ph_M_9;
-    uint32_t st_iRng_10 = pstate->iRng_10;
-    float st_fDrift_11 = pstate->fDrift_11;
-    float st_fSmoo_14 = pstate->fSmoo_14;
-    float st_fRec_hp1_M_17 = pstate->fRec_hp1_M_17;
-    float st_fRec_lp1_M_19 = pstate->fRec_lp1_M_19;
-    float st_fRec_fb_flanger_tank_step_M_21 = pstate->fRec_fb_flanger_tank_step_M_21;
-    float st_fRec_lp1_M_24 = pstate->fRec_lp1_M_24;
+    uint32_t st_iRng_8 = pstate->iRng_8;
+    float st_fDrift_9 = pstate->fDrift_9;
+    float st_fSmoo_12 = pstate->fSmoo_12;
+    float st_fRec_hp1_M_15 = pstate->fRec_hp1_M_15;
+    float st_fRec_lp1_M_17 = pstate->fRec_lp1_M_17;
+    float st_fRec_fb_flanger_tank_step_M_19 = pstate->fRec_fb_flanger_tank_step_M_19;
+    float st_fRec_lp1_M_22 = pstate->fRec_lp1_M_22;
+    float st_fTf1_z1_M_24 = pstate->fTf1_z1_M_24;
     float st_fTf1_z1_M_26 = pstate->fTf1_z1_M_26;
-    float st_fTf1_z1_M_28 = pstate->fTf1_z1_M_28;
-    float st_fSmoo_30 = pstate->fSmoo_30;
-    float st_fSmoo_38 = pstate->fSmoo_38;
+    float st_fSmoo_28 = pstate->fSmoo_28;
+    float st_fSmoo_36 = pstate->fSmoo_36;
+    uint32_t st_lfo_ph_0 = pstate->lfo_ph_0;
+    uint32_t st_lfo_ph_1 = pstate->lfo_ph_1;
     if (!(st_fEnv_M_3 > -1.0e12f && st_fEnv_M_3 < 1.0e12f)) st_fEnv_M_3 = 0.0f;
     if (!(st_fSmoo_5 > -1.0e12f && st_fSmoo_5 < 1.0e12f)) st_fSmoo_5 = 0.0f;
     if (!(st_fSmoo_7 > -1.0e12f && st_fSmoo_7 < 1.0e12f)) st_fSmoo_7 = 0.0f;
-    if (!(st_fOsc_ph_M_8 > -1.0e12f && st_fOsc_ph_M_8 < 1.0e12f)) st_fOsc_ph_M_8 = 0.0f;
-    if (!(st_fOsc_ph_M_9 > -1.0e12f && st_fOsc_ph_M_9 < 1.0e12f)) st_fOsc_ph_M_9 = 0.0f;
-    if (!(st_fDrift_11 > -1.0e12f && st_fDrift_11 < 1.0e12f)) st_fDrift_11 = 0.0f;
-    if (!(st_fSmoo_14 > -1.0e12f && st_fSmoo_14 < 1.0e12f)) st_fSmoo_14 = 0.0f;
-    if (!(st_fRec_hp1_M_17 > -1.0e12f && st_fRec_hp1_M_17 < 1.0e12f)) st_fRec_hp1_M_17 = 0.0f;
-    if (!(st_fRec_lp1_M_19 > -1.0e12f && st_fRec_lp1_M_19 < 1.0e12f)) st_fRec_lp1_M_19 = 0.0f;
-    if (!(st_fRec_fb_flanger_tank_step_M_21 > -1.0e12f && st_fRec_fb_flanger_tank_step_M_21 < 1.0e12f)) st_fRec_fb_flanger_tank_step_M_21 = 0.0f;
-    if (!(st_fRec_lp1_M_24 > -1.0e12f && st_fRec_lp1_M_24 < 1.0e12f)) st_fRec_lp1_M_24 = 0.0f;
+    if (!(st_fDrift_9 > -1.0e12f && st_fDrift_9 < 1.0e12f)) st_fDrift_9 = 0.0f;
+    if (!(st_fSmoo_12 > -1.0e12f && st_fSmoo_12 < 1.0e12f)) st_fSmoo_12 = 0.0f;
+    if (!(st_fRec_hp1_M_15 > -1.0e12f && st_fRec_hp1_M_15 < 1.0e12f)) st_fRec_hp1_M_15 = 0.0f;
+    if (!(st_fRec_lp1_M_17 > -1.0e12f && st_fRec_lp1_M_17 < 1.0e12f)) st_fRec_lp1_M_17 = 0.0f;
+    if (!(st_fRec_fb_flanger_tank_step_M_19 > -1.0e12f && st_fRec_fb_flanger_tank_step_M_19 < 1.0e12f)) st_fRec_fb_flanger_tank_step_M_19 = 0.0f;
+    if (!(st_fRec_lp1_M_22 > -1.0e12f && st_fRec_lp1_M_22 < 1.0e12f)) st_fRec_lp1_M_22 = 0.0f;
+    if (!(st_fTf1_z1_M_24 > -1.0e12f && st_fTf1_z1_M_24 < 1.0e12f)) st_fTf1_z1_M_24 = 0.0f;
     if (!(st_fTf1_z1_M_26 > -1.0e12f && st_fTf1_z1_M_26 < 1.0e12f)) st_fTf1_z1_M_26 = 0.0f;
-    if (!(st_fTf1_z1_M_28 > -1.0e12f && st_fTf1_z1_M_28 < 1.0e12f)) st_fTf1_z1_M_28 = 0.0f;
-    if (!(st_fSmoo_30 > -1.0e12f && st_fSmoo_30 < 1.0e12f)) st_fSmoo_30 = 0.0f;
-    if (!(st_fSmoo_38 > -1.0e12f && st_fSmoo_38 < 1.0e12f)) st_fSmoo_38 = 0.0f;
+    if (!(st_fSmoo_28 > -1.0e12f && st_fSmoo_28 < 1.0e12f)) st_fSmoo_28 = 0.0f;
+    if (!(st_fSmoo_36 > -1.0e12f && st_fSmoo_36 < 1.0e12f)) st_fSmoo_36 = 0.0f;
     float * restrict dline_0 = ((float *)dbaseAddr) + 0u;
     float * restrict dline_1 = ((float *)dbaseAddr) + 1040u;
     float * restrict dline_2 = ((float *)dbaseAddr) + 2080u;
@@ -539,38 +547,68 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     if (pstate->init_magic != 0x46535431u) {
         st_fSmoo_5 = fHslider1 * 0.01f;
         st_fSmoo_7 = fHslider2 * 0.01f;
-        st_fSmoo_14 = fHslider0;
-        st_fSmoo_30 = fHslider3 * 0.01f;
-        st_fSmoo_38 = fHslider4 * 0.01f;
+        st_fSmoo_12 = fHslider0;
+        st_fSmoo_28 = fHslider3 * 0.01f;
+        st_fSmoo_36 = fHslider4 * 0.01f;
         pstate->init_magic = 0x46535431u;
     } else {
         st_fSmoo_5 += 0.03152f * ((fHslider1 * 0.01f) - st_fSmoo_5);
         st_fSmoo_7 += 0.03152f * ((fHslider2 * 0.01f) - st_fSmoo_7);
-        st_fSmoo_14 += 0.03152f * ((fHslider0) - st_fSmoo_14);
-        st_fSmoo_30 += 0.03152f * ((fHslider3 * 0.01f) - st_fSmoo_30);
-        st_fSmoo_38 += 0.03152f * ((fHslider4 * 0.01f) - st_fSmoo_38);
+        st_fSmoo_12 += 0.03152f * ((fHslider0) - st_fSmoo_12);
+        st_fSmoo_28 += 0.03152f * ((fHslider3 * 0.01f) - st_fSmoo_28);
+        st_fSmoo_36 += 0.03152f * ((fHslider4 * 0.01f) - st_fSmoo_36);
     }
     float k_env_depth_0 = st_fSmoo_5;
     float k_drift_depth_1 = st_fSmoo_7;
-    if (st_iRng_10 == 0u) st_iRng_10 = 0x52415431u;
-    st_iRng_10 ^= st_iRng_10 << 13;
-    st_iRng_10 ^= st_iRng_10 >> 17;
-    st_iRng_10 ^= st_iRng_10 << 5;
-    float k_white_noise = (float)((int32_t)st_iRng_10) * 4.6566129e-10f;
-    st_fDrift_11 += (0.0035f) * (k_white_noise - st_fDrift_11);
-    float k_manual_ms_2 = st_fSmoo_14;
+    if (st_iRng_8 == 0u) st_iRng_8 = 0x52415431u;
+    st_iRng_8 ^= st_iRng_8 << 13;
+    st_iRng_8 ^= st_iRng_8 >> 17;
+    st_iRng_8 ^= st_iRng_8 << 5;
+    float k_white_noise = (float)((int32_t)st_iRng_8) * 4.6566129e-10f;
+    st_fDrift_9 += (0.0035f) * (k_white_noise - st_fDrift_9);
+    float k_manual_ms_2 = st_fSmoo_12;
     float k_man_norm_3 = (k_manual_ms_2 - 0.5f) * 0.13333333f;
     float k_man_root_4 = k_man_norm_3 * (0.55f + 0.45f * k_man_norm_3);
-    float k_feedback_5 = st_fSmoo_30;
+    float k_feedback_5 = st_fSmoo_28;
     float k_stereo_mode_6 = fHslider5;
     float k_fn_7 = ((k_stereo_mode_6 > 0.5f) ? (0.5f) : (1.0f));
     float k_r_tap_mul_8 = k_fn_7;
-    float k_depth_mix_9 = st_fSmoo_38;
+    float k_depth_mix_9 = st_fSmoo_36;
     float k_fn_10 = sh_fabsf(k_depth_mix_9);
     float k_fn_11 = sh_fabsf(k_feedback_5);
     float k_out_trim_12 = sh_fdiv(1.0f, (1.0f + 0.25f * k_fn_10 + 0.28f * k_fn_10 * k_fn_11));
     float k_fn_13 = ((k_stereo_mode_6 > 0.5f) ? (-1.0f) : (1.0f));
     float k_r_pol_14 = k_fn_13;
+
+    /* ---- 4b. Stock-style Q31 LFO Loop 1 (16 frames, ctx[9..10]) ------- */
+    float sh_lfo_0[SH_FRAMES];
+    float sh_lfo_1[SH_FRAMES];
+    {
+        uint32_t ph_0 = st_lfo_ph_0;
+        uint32_t inc_0 = (uint32_t)(int32_t)sh_maxf(0.0f, (0.11f) * 97391.548f);
+        uint32_t ph_1 = st_lfo_ph_1;
+        uint32_t inc_1 = (uint32_t)(int32_t)sh_maxf(0.0f, (0.29f) * 97391.548f);
+#ifdef __TI_COMPILER_VERSION__
+#pragma MUST_ITERATE(SH_FRAMES, SH_FRAMES)
+#pragma UNROLL(1)
+#endif
+        for (i0 = 0; i0 < SH_FRAMES; i0++) {
+            ph_0 += inc_0;
+            {
+                float _x = (float)((int32_t)ph_0 >> 8) * (1.0f / 8388608.0f);
+                float _y = 4.0f * _x * (1.0f - sh_fabsf(_x));
+                sh_lfo_0[i0] = _y * (0.225f * sh_fabsf(_y) + 0.775f);
+            }
+            ph_1 += inc_1;
+            {
+                float _x = (float)((int32_t)ph_1 >> 8) * (1.0f / 8388608.0f);
+                float _y = 4.0f * _x * (1.0f - sh_fabsf(_x));
+                sh_lfo_1[i0] = _y * (0.225f * sh_fabsf(_y) + 0.775f);
+            }
+        }
+        st_lfo_ph_0 = ph_0;
+        st_lfo_ph_1 = ph_1;
+    }
 
     /* ---- 5. FAUST sample-rate loop (16 frames, stereo in-place) -------- */
 #ifdef __TI_COMPILER_VERSION__
@@ -598,46 +636,40 @@ void SH_AUDIO_FN(void **instance, void **ctx)
         st_fEnv_M_3 += fEnvK_4 * (fEnvIn_4 - st_fEnv_M_3);
         float fWith_mod_delay_smps_vox_env_4 = st_fEnv_M_3;
         float fWith_mod_delay_smps_env_push_6 = sh_minf(1.0f, (fWith_mod_delay_smps_vox_env_4) * 2.8f) * k_env_depth_0;
-        st_fOsc_ph_M_8 += 4.9886621e-06f;
-        if (st_fOsc_ph_M_8 >= 1.0f) st_fOsc_ph_M_8 -= 2.0f;
-        if (st_fOsc_ph_M_8 < -1.0f) st_fOsc_ph_M_8 += 2.0f;
-        st_fOsc_ph_M_9 += 1.3151927e-05f;
-        if (st_fOsc_ph_M_9 >= 1.0f) st_fOsc_ph_M_9 -= 2.0f;
-        if (st_fOsc_ph_M_9 < -1.0f) st_fOsc_ph_M_9 += 2.0f;
-        float fSig_non_periodic_drift_12 = 0.50f * st_fDrift_11 + 0.30f * sh_sinf(3.14159265f * st_fOsc_ph_M_8) + 0.20f * sh_sinf(3.14159265f * st_fOsc_ph_M_9);
-        float fWith_mod_delay_smps_drift_val_13 = fSig_non_periodic_drift_12 * k_drift_depth_1 * 0.45f;
-        float fWith_mod_delay_smps_m_clamped_15 = sh_clipf(k_man_root_4 + (fWith_mod_delay_smps_env_push_6) + (fWith_mod_delay_smps_drift_val_13), 0.0f, 1.0f);
-        float fWith_process_t_mod_16 = (24.0f + 360.0f * ((fWith_mod_delay_smps_m_clamped_15) * (fWith_mod_delay_smps_m_clamped_15)));
-        float fTmp_hpIn_18 = (in0);
-        st_fRec_hp1_M_17 += 0.035618962f * (fTmp_hpIn_18 - st_fRec_hp1_M_17);
-        st_fRec_lp1_M_19 += 0.64114132f * (((fTmp_hpIn_18 - st_fRec_hp1_M_17)) - st_fRec_lp1_M_19);
-        float fWith_process_wet_in_20 = (st_fRec_lp1_M_19);
-        float fDelIn_22 = (st_fRec_fb_flanger_tank_step_M_21);
-        dline_1[st_iWpos_1] = fDelIn_22;
-        float fDelOut_22 = sh_dread_3(dline_1, st_iWpos_1, (fWith_process_t_mod_16));
-        float fWith_flanger_tank_step_fb_prev_23 = fDelOut_22;
-        st_fRec_lp1_M_24 += 0.5699034f * (((fWith_flanger_tank_step_fb_prev_23)) - st_fRec_lp1_M_24);
-        float fWith_flanger_tank_step_fb_damped_25 = st_fRec_lp1_M_24;
-        float fTf1In_27 = (fWith_flanger_tank_step_fb_damped_25);
-        float fTf1Out_27 = ((-0.42f)) * fTf1In_27 + st_fTf1_z1_M_26;
-        st_fTf1_z1_M_26 = sh_clipf((1.0f) * fTf1In_27 - ((-0.42f)) * fTf1Out_27, -16.0f, 16.0f);
-        float fWith_flanger_tank_step_fb_ap1_27 = (fTf1Out_27);
-        float fTf1In_29 = (fWith_flanger_tank_step_fb_ap1_27);
-        float fTf1Out_29 = ((0.37f)) * fTf1In_29 + st_fTf1_z1_M_28;
-        st_fTf1_z1_M_28 = sh_clipf((1.0f) * fTf1In_29 - ((0.37f)) * fTf1Out_29, -16.0f, 16.0f);
-        float fWith_flanger_tank_step_fb_ap2_29 = (fTf1Out_29);
-        float fWith_flanger_tank_step_fb_sig_31 = sh_tanhf((fWith_flanger_tank_step_fb_ap2_29) * k_feedback_5);
-        float fRecNext_flanger_tank_step_32 = (fWith_process_wet_in_20) + (fWith_flanger_tank_step_fb_sig_31);
-        st_fRec_fb_flanger_tank_step_M_21 = fRecNext_flanger_tank_step_32;
-        float fWith_process_tank_sig_33 = (fRecNext_flanger_tank_step_32);
-        float fDelIn_34 = (fWith_process_tank_sig_33);
-        dline_2[st_iWpos_1] = fDelIn_34;
-        float fDelOut_34 = sh_dread_3(dline_2, st_iWpos_1, (fWith_process_t_mod_16));
-        float fWith_process_wet_l_35 = fDelOut_34;
-        float fDelOut_36 = sh_dread_3(dline_2, st_iWpos_1, (fWith_process_t_mod_16) * k_r_tap_mul_8);
-        float fWith_process_wet_r_37 = fDelOut_36;
-        out0 = ((fWith_process_dry_aligned_2) + k_depth_mix_9 * (fWith_process_wet_l_35)) * k_out_trim_12;
-        out1 = ((fWith_process_dry_aligned_2) + k_depth_mix_9 * k_r_pol_14 * (fWith_process_wet_r_37)) * k_out_trim_12;
+        float fSig_non_periodic_drift_10 = 0.50f * st_fDrift_9 + 0.30f * sh_lfo_0[i0] + 0.20f * sh_lfo_1[i0];
+        float fWith_mod_delay_smps_drift_val_11 = fSig_non_periodic_drift_10 * k_drift_depth_1 * 0.45f;
+        float fWith_mod_delay_smps_m_clamped_13 = sh_clipf(k_man_root_4 + (fWith_mod_delay_smps_env_push_6) + (fWith_mod_delay_smps_drift_val_11), 0.0f, 1.0f);
+        float fWith_process_t_mod_14 = (24.0f + 360.0f * ((fWith_mod_delay_smps_m_clamped_13) * (fWith_mod_delay_smps_m_clamped_13)));
+        float fTmp_hpIn_16 = (in0);
+        st_fRec_hp1_M_15 += 0.035618962f * (fTmp_hpIn_16 - st_fRec_hp1_M_15);
+        st_fRec_lp1_M_17 += 0.64114132f * (((fTmp_hpIn_16 - st_fRec_hp1_M_15)) - st_fRec_lp1_M_17);
+        float fWith_process_wet_in_18 = (st_fRec_lp1_M_17);
+        float fDelIn_20 = (st_fRec_fb_flanger_tank_step_M_19);
+        dline_1[st_iWpos_1] = fDelIn_20;
+        float fDelOut_20 = sh_dread_3(dline_1, st_iWpos_1, (fWith_process_t_mod_14));
+        float fWith_flanger_tank_step_fb_prev_21 = fDelOut_20;
+        st_fRec_lp1_M_22 += 0.5699034f * (((fWith_flanger_tank_step_fb_prev_21)) - st_fRec_lp1_M_22);
+        float fWith_flanger_tank_step_fb_damped_23 = st_fRec_lp1_M_22;
+        float fTf1In_25 = (fWith_flanger_tank_step_fb_damped_23);
+        float fTf1Out_25 = ((-0.42f)) * fTf1In_25 + st_fTf1_z1_M_24;
+        st_fTf1_z1_M_24 = sh_clipf((1.0f) * fTf1In_25 - ((-0.42f)) * fTf1Out_25, -16.0f, 16.0f);
+        float fWith_flanger_tank_step_fb_ap1_25 = (fTf1Out_25);
+        float fTf1In_27 = (fWith_flanger_tank_step_fb_ap1_25);
+        float fTf1Out_27 = ((0.37f)) * fTf1In_27 + st_fTf1_z1_M_26;
+        st_fTf1_z1_M_26 = sh_clipf((1.0f) * fTf1In_27 - ((0.37f)) * fTf1Out_27, -16.0f, 16.0f);
+        float fWith_flanger_tank_step_fb_ap2_27 = (fTf1Out_27);
+        float fWith_flanger_tank_step_fb_sig_29 = sh_tanhf((fWith_flanger_tank_step_fb_ap2_27) * k_feedback_5);
+        float fRecNext_flanger_tank_step_30 = (fWith_process_wet_in_18) + (fWith_flanger_tank_step_fb_sig_29);
+        st_fRec_fb_flanger_tank_step_M_19 = fRecNext_flanger_tank_step_30;
+        float fWith_process_tank_sig_31 = (fRecNext_flanger_tank_step_30);
+        float fDelIn_32 = (fWith_process_tank_sig_31);
+        dline_2[st_iWpos_1] = fDelIn_32;
+        float fDelOut_32 = sh_dread_3(dline_2, st_iWpos_1, (fWith_process_t_mod_14));
+        float fWith_process_wet_l_33 = fDelOut_32;
+        float fDelOut_34 = sh_dread_3(dline_2, st_iWpos_1, (fWith_process_t_mod_14) * k_r_tap_mul_8);
+        float fWith_process_wet_r_35 = fDelOut_34;
+        out0 = ((fWith_process_dry_aligned_2) + k_depth_mix_9 * (fWith_process_wet_l_33)) * k_out_trim_12;
+        out1 = ((fWith_process_dry_aligned_2) + k_depth_mix_9 * k_r_pol_14 * (fWith_process_wet_r_35)) * k_out_trim_12;
 
         /* Firmware bypass crossfade & mandatory (-8, +8) output NaN clamp */
         float outL = dryL + fade * (out0 - dryL);
@@ -655,17 +687,17 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     pstate->fEnv_M_3 = st_fEnv_M_3;
     pstate->fSmoo_5 = st_fSmoo_5;
     pstate->fSmoo_7 = st_fSmoo_7;
-    pstate->fOsc_ph_M_8 = st_fOsc_ph_M_8;
-    pstate->fOsc_ph_M_9 = st_fOsc_ph_M_9;
-    pstate->iRng_10 = st_iRng_10;
-    pstate->fDrift_11 = st_fDrift_11;
-    pstate->fSmoo_14 = st_fSmoo_14;
-    pstate->fRec_hp1_M_17 = st_fRec_hp1_M_17;
-    pstate->fRec_lp1_M_19 = st_fRec_lp1_M_19;
-    pstate->fRec_fb_flanger_tank_step_M_21 = st_fRec_fb_flanger_tank_step_M_21;
-    pstate->fRec_lp1_M_24 = st_fRec_lp1_M_24;
+    pstate->iRng_8 = st_iRng_8;
+    pstate->fDrift_9 = st_fDrift_9;
+    pstate->fSmoo_12 = st_fSmoo_12;
+    pstate->fRec_hp1_M_15 = st_fRec_hp1_M_15;
+    pstate->fRec_lp1_M_17 = st_fRec_lp1_M_17;
+    pstate->fRec_fb_flanger_tank_step_M_19 = st_fRec_fb_flanger_tank_step_M_19;
+    pstate->fRec_lp1_M_22 = st_fRec_lp1_M_22;
+    pstate->fTf1_z1_M_24 = st_fTf1_z1_M_24;
     pstate->fTf1_z1_M_26 = st_fTf1_z1_M_26;
-    pstate->fTf1_z1_M_28 = st_fTf1_z1_M_28;
-    pstate->fSmoo_30 = st_fSmoo_30;
-    pstate->fSmoo_38 = st_fSmoo_38;
+    pstate->fSmoo_28 = st_fSmoo_28;
+    pstate->fSmoo_36 = st_fSmoo_36;
+    pstate->lfo_ph_0 = st_lfo_ph_0;
+    pstate->lfo_ph_1 = st_lfo_ph_1;
 }

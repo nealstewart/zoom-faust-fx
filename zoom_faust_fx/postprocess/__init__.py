@@ -30,6 +30,7 @@ from .models import (
     FaustMemoryReport,
     FaustMeta,
     FaustParam,
+    LfoSpec,
     parse_faust_dsp_metadata,
 )
 from .rewriter import (
@@ -61,6 +62,7 @@ __all__ = [
     "FaustMemoryReport",
     "FaustMeta",
     "FaustParam",
+    "LfoSpec",
     "parse_faust_dsp_metadata",
     "C674X_FAUST_HEADER",
     "MATH_REDIRECTS",

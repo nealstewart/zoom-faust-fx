@@ -598,17 +598,36 @@ function pauseSample() {
   $("playSampleBtn").textContent = "▶ Play";
 }
 
+let lastTimeText = "";
+let lastScrubVal = -1;
+
 function updateTimeDisplay() {
+  const timeEl = $("timeDisplay");
+  const scrubEl = $("scrubSlider");
   if (!state.currentBuffer) {
-    $("timeDisplay").textContent = "0:00 / 0:00";
-    $("scrubSlider").value = 0;
+    if (lastTimeText !== "0:00 / 0:00") {
+      lastTimeText = "0:00 / 0:00";
+      timeEl.textContent = lastTimeText;
+    }
+    if (lastScrubVal !== 0) {
+      lastScrubVal = 0;
+      scrubEl.value = 0;
+    }
     return;
   }
   const dur = state.currentBuffer.duration;
   const pos = getSamplePlayhead();
-  $("timeDisplay").textContent = `${formatTime(pos)} / ${formatTime(dur)}`;
+  const txt = `${formatTime(pos)} / ${formatTime(dur)}`;
+  if (txt !== lastTimeText) {
+    lastTimeText = txt;
+    timeEl.textContent = txt;
+  }
   if (dur > 0) {
-    $("scrubSlider").value = Math.round((pos / dur) * 1000);
+    const sv = Math.round((pos / dur) * 1000);
+    if (sv !== lastScrubVal) {
+      lastScrubVal = sv;
+      scrubEl.value = sv;
+    }
   }
 }
 
@@ -857,12 +876,15 @@ function schedulePadNote(freq, when, holdDur = 2.4, peakAmp = 0.14, pan = 0) {
   filtLfo.connect(filtLfoGain);
   filtLfoGain.connect(f1.frequency);
 
-  // Long >1s attack & >1s release VCA envelope
+  // Long >1s attack & >1s release VCA envelope (smooth sustain ramp + true zero tail)
+  const stopAt = endTime + 0.08;
+  const safePeak = peakAmp * 0.78;
   const env = ctx.createGain();
-  env.gain.setValueAtTime(0.0001, when);
-  env.gain.linearRampToValueAtTime(peakAmp, when + attack);
-  env.gain.setValueAtTime(peakAmp * 0.92, releaseStart);
+  env.gain.setValueAtTime(0.0, when);
+  env.gain.linearRampToValueAtTime(safePeak, when + attack);
+  env.gain.linearRampToValueAtTime(safePeak * 0.92, releaseStart);
   env.gain.exponentialRampToValueAtTime(0.0001, endTime);
+  env.gain.linearRampToValueAtTime(0.0, stopAt - 0.01);
 
   osc1.connect(f1);
   osc2.connect(f1);
@@ -888,7 +910,6 @@ function schedulePadNote(freq, when, holdDur = 2.4, peakAmp = 0.14, pan = 0) {
   driftLfo.start(when);
   filtLfo.start(when);
 
-  const stopAt = endTime + 0.08;
   osc1.stop(stopAt);
   osc2.stop(stopAt);
   oscSub.stop(stopAt);
@@ -908,8 +929,10 @@ function fadeOutActivePads() {
   const now = state.ctx.currentTime;
   for (const env of activePadEnvs) {
     try {
+      const cur = env.gain.value;
       env.gain.cancelScheduledValues(now);
-      env.gain.setTargetAtTime(0.0001, now, 0.14);
+      env.gain.setValueAtTime(cur, now);
+      env.gain.setTargetAtTime(0.0, now, 0.08);
     } catch (_) {}
   }
 }
@@ -1767,41 +1790,78 @@ function renderPedalboard() {
 }
 
 // ---- Meters & Oscilloscope ----
+let meterEls = null;
+let topbarEl = null;
+const mobileMixMql = window.matchMedia("(max-width: 860px)");
+const lastMeterPct = [-1, -1, -1, -1];
+
+function isMixVisible() {
+  if (!mobileMixMql.matches) return true;
+  if (!topbarEl) topbarEl = document.querySelector(".topbar");
+  return Boolean(topbarEl && topbarEl.classList.contains("master-open"));
+}
+
 function updateMeters(inL, inR, outL, outR) {
-  const pct = (v) => Math.min(100, Math.round(Math.pow(Math.min(v, 1.2), 0.65) * 90));
-  $("meterInL").style.width = `${pct(inL)}%`;
-  $("meterInR").style.width = `${pct(inR)}%`;
-  $("meterOutL").style.width = `${pct(outL)}%`;
-  $("meterOutR").style.width = `${pct(outR)}%`;
+  if (!isMixVisible()) return;
+  if (!meterEls) {
+    meterEls = [$("meterInL"), $("meterInR"), $("meterOutL"), $("meterOutR")];
+  }
+  const vals = [inL, inR, outL, outR];
+  for (let i = 0; i < 4; i++) {
+    const el = meterEls[i];
+    if (!el) continue;
+    const p = Math.min(100, Math.round(Math.pow(Math.min(vals[i], 1.2), 0.65) * 90));
+    if (p !== lastMeterPct[i]) {
+      lastMeterPct[i] = p;
+      el.style.transform = `scaleX(${(p * 0.01).toFixed(2)})`;
+    }
+  }
 }
 
 function startAnimationLoop() {
   const canvas = $("scopeCanvas");
-  const g = canvas.getContext("2d");
+  const g = canvas.getContext("2d", { alpha: false });
   const timeBuf = new Float32Array(512);
   const freqBuf = new Uint8Array(512);
+  let lastDraw = 0;
+  let idleDrawn = false;
 
-  function tick() {
-    requestAnimationFrame(tick);
-
-    if (state.samplePlaying) {
-      updateTimeDisplay();
-    }
-
-    const w = canvas.width;
-    const h = canvas.height;
+  function drawBackground(w, h) {
     g.fillStyle = "#12f094";
     g.fillRect(0, 0, w, h);
-
-    // Subtle LCD grid center line
     g.strokeStyle = "rgba(4, 59, 36, 0.24)";
     g.lineWidth = 1;
     g.beginPath();
     g.moveTo(0, h / 2);
     g.lineTo(w, h / 2);
     g.stroke();
+  }
 
-    if (!state.analyser) return;
+  function tick(now) {
+    requestAnimationFrame(tick);
+    if (document.hidden) return;
+    if (now - lastDraw < 33) return; // ~30 FPS cap
+    lastDraw = now;
+
+    if (state.samplePlaying) {
+      updateTimeDisplay();
+    }
+
+    // On mobile (<= 860px), skip all canvas drawing while the Mix panel is collapsed
+    if (!isMixVisible()) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const running = Boolean(state.analyser && state.ctx && state.ctx.state === "running");
+    if (!running) {
+      if (!idleDrawn) {
+        drawBackground(w, h);
+        idleDrawn = true;
+      }
+      return;
+    }
+    idleDrawn = false;
+    drawBackground(w, h);
 
     if (state.scopeMode === "scope") {
       state.analyser.getFloatTimeDomainData(timeBuf);
@@ -1827,7 +1887,7 @@ function startAnimationLoop() {
       }
     }
   }
-  tick();
+  requestAnimationFrame(tick);
 }
 
 function switchSourceTab(tab) {

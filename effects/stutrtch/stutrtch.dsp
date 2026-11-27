@@ -163,8 +163,8 @@ process(xL, xR) = (xL + mix_knob * (wetL - xL)),
 
         // Three decorrelated noise streams in [0, 1)
         n1 = abs(no.noise);
-        n2 = ma.frac(abs(no.noise * 17.31 + os.osc(3.71)));
-        n3 = ma.frac(abs(no.noise * 43.17 + os.osc(7.13)));
+        n2 = ma.frac(abs(no.noise * 17.31 + zm_osc(3.71)));
+        n3 = ma.frac(abs(no.noise * 43.17 + zm_osc(7.13)));
 
         // Run unified 3-wire recursive stutter engine -> 4th output is stut_sig
         stut_sig = (stut_engine_step(mono_in, is_frozen, stomp_edge, n1, n2, n3) ~ (_, _, _)) : !, !, !, _;

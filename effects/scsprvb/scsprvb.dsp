@@ -87,8 +87,8 @@ scsp_pack(x) = ba.if(pack_steps < 1.0, x, int(x * inv_q) * q_step)
     };
 
 // Gentle SCSP chorus/shimmer LFO modulation for the FDN read taps
-lfo1 = os.osc(0.43) * 5.5;
-lfo2 = os.osc(0.61) * 5.5;
+lfo1 = zm_osc(0.43) * 5.5;
+lfo2 = zm_osc(0.61) * 5.5;
 
 // ---- 3. Stereo Orthogonal Hadamard FDN Tanks in External SDRAM ----
 // 4 x 4096-sample SDRAM ring buffers (~65 KB) + pre-delay + all-pass diffusers
@@ -126,8 +126,8 @@ scsp_tank_r(inR, inL) = (scsp_fdn_r_step(inR, inL) ~ (_, _)) : !, !, _;
 
 // ---- 4. Full Stereo Signal Chain ----
 process(xL, xR) =
-    (xL * dry_g + wetL * wet_g * 1.25) * level_knob,
-    (xR * dry_g + wetR * wet_g * 1.25) * level_knob
+    zm_soft_clip(xL * dry_g + wetL * wet_g * 1.15) * level_knob,
+    zm_soft_clip(xR * dry_g + wetR * wet_g * 1.15) * level_knob
     with {
         // Pre-delay (4096 samples = up to 92 ms @ 44.1 kHz)
         preL = de.delay(4096, pre_samp, xL);

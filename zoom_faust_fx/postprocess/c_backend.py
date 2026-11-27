@@ -9,7 +9,7 @@ import re
 from typing import List, Tuple
 
 from .emitter import _emit_c674x_kernel_from_parts
-from .models import FaustMeta, FaustParam, strip_c_comments
+from .models import FaustMeta, FaustParam, LfoSpec, strip_c_comments
 
 
 def _parse_c_float(expr: str) -> float:
@@ -99,6 +99,8 @@ def convert_faust_c_to_zd2_kernel(
                 unit=matched.unit if matched else "",
                 values=matched.values if matched else None,
                 time_sync=matched.time_sync if matched else None,
+                lfo_sync=matched.lfo_sync if matched else None,
+                is_q31_lfo_rate=matched.is_q31_lfo_rate if matched else False,
                 order=matched.order if matched else len(c_params_with_pos),
             ),
         ))
@@ -120,6 +122,8 @@ def convert_faust_c_to_zd2_kernel(
                 unit=matched.unit if matched else "",
                 values=matched.values if matched else None,
                 time_sync=matched.time_sync if matched else None,
+                lfo_sync=matched.lfo_sync if matched else None,
+                is_q31_lfo_rate=matched.is_q31_lfo_rate if matched else False,
                 order=matched.order if matched else len(c_params_with_pos),
             ),
         ))
@@ -246,6 +250,90 @@ def convert_faust_c_to_zd2_kernel(
             cline = re.sub(r"\bdsp->fSampleRate\b|\bsample_rate\b", "SH_SAMPLE_RATE", cline)
             init_const_lines.append(cline)
 
+    # Extract __sh_lfo_* foreign-function markers emitted by faust_bridge into Loop 1 LfoSpecs
+    lfo_specs: List[LfoSpec] = []
+    lfo_groups: dict[tuple[int | None, str | None], int] = {}
+    lfo_marker_re = re.compile(
+        r"\b__sh_lfo_(sawpos_phase|sawpos|saw|trianglepos|triangle|squarewavepos|squarewave|oscp|osccos|osc|sh)\s*\(([^;]*?)\)"
+    )
+
+    slow_to_slider: dict[str, str] = {}
+    for sm in re.finditer(
+        r"\b(?:float|FAUSTFLOAT)\s+(fSlow\d+)\s*=\s*(?:\(\s*(?:float|FAUSTFLOAT)\s*\)\s*)?\(?\s*dsp->(f(?:Hslider|Vslider|Entry)\d+)\s*\)?\s*;",
+        pre_loop,
+    ):
+        slow_to_slider[sm.group(1)] = sm.group(2)
+
+    def _replace_lfo_marker(m: re.Match[str]) -> str:
+        kind = m.group(1)
+        raw_args = [a.strip() for a in m.group(2).split(",")]
+        freq_arg = raw_args[0] if raw_args else "1.0f"
+        cleaned = re.sub(r"^\(\s*(?:float|FAUSTFLOAT)\s*\)\s*", "", freq_arg).strip("() ")
+        cleaned = slow_to_slider.get(cleaned, cleaned)
+        rate_param_idx = None
+        rate_expr = cleaned
+        for idx, p in enumerate(params):
+            if cleaned in (p.var_name, f"dsp->{p.var_name}"):
+                rate_param_idx = idx
+                rate_expr = None
+                p.is_q31_lfo_rate = True
+                break
+
+        shape_map = {
+            "sawpos_phase": "sawpos",
+            "sawpos": "sawpos",
+            "saw": "saw",
+            "trianglepos": "trianglepos",
+            "triangle": "triangle",
+            "squarewavepos": "squarewavepos",
+            "squarewave": "squarewave",
+            "oscp": "sin",
+            "osccos": "cos",
+            "osc": "sin",
+            "sh": "sh",
+        }
+        shape = shape_map[kind]
+        phase_offset_u32 = 0
+        phase_expr = None
+        phase_is_radians = kind == "oscp"
+        if kind in ("sawpos_phase", "oscp") and len(raw_args) >= 3:
+            p_raw = re.sub(r"^\(\s*(?:float|FAUSTFLOAT)\s*\)\s*", "", raw_args[1]).strip("() fF")
+            try:
+                pv = float(p_raw)
+                import math as _m
+                if phase_is_radians:
+                    phase_offset_u32 = int(round((pv / (2.0 * _m.pi)) * 4294967296.0)) & 0xFFFFFFFF
+                else:
+                    phase_offset_u32 = int(round(pv * 4294967296.0)) & 0xFFFFFFFF
+            except ValueError:
+                phase_expr = raw_args[1]
+
+        gkey = (rate_param_idx, rate_expr)
+        if gkey in lfo_groups:
+            gid = lfo_groups[gkey]
+        else:
+            gid = len(lfo_groups)
+            lfo_groups[gkey] = gid
+
+        lid = len(lfo_specs)
+        buf_name = f"sh_lfo_{lid}"
+        lfo_specs.append(
+            LfoSpec(
+                lfo_id=lid,
+                phase_group_id=gid,
+                shape=shape,
+                buf_name=buf_name,
+                rate_param_idx=rate_param_idx,
+                rate_expr=rate_expr,
+                phase_offset_u32=phase_offset_u32,
+                phase_expr=phase_expr,
+                phase_is_radians=phase_is_radians,
+            )
+        )
+        return f"{buf_name}[i0]"
+
+    loop_inner = lfo_marker_re.sub(_replace_lfo_marker, loop_inner)
+
     return _emit_c674x_kernel_from_parts(
         meta,
         params,
@@ -256,4 +344,5 @@ def convert_faust_c_to_zd2_kernel(
         sdram_arrays=sdram_arrays,
         init_const_lines=init_const_lines,
         bpm_var_name=bpm_var_name,
+        lfo_specs=lfo_specs,
     )

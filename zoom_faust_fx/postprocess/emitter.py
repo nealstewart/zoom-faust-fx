@@ -16,8 +16,131 @@ from .models import (
     FaustMemoryLimitError,
     FaustMeta,
     FaustParam,
+    LfoSpec,
 )
 from .rewriter import C674X_FAUST_HEADER, rewrite_c_divisions_and_math
+
+
+def _build_lfo_loop1_c(
+    lfo_specs: List[LfoSpec],
+    params: List[FaustParam],
+    replace_dsp_refs,
+) -> str:
+    """Emit stock-style 16-sample Q31 LFO Loop 1 streaming `ctx[9..10]`."""
+    if not lfo_specs:
+        return ""
+
+    buf_decls = [f"    float {lfo.buf_name}[SH_FRAMES];" for lfo in lfo_specs]
+
+    # Group phase accumulators by phase_group_id
+    groups: dict[int, List[LfoSpec]] = {}
+    for lfo in lfo_specs:
+        groups.setdefault(lfo.phase_group_id, []).append(lfo)
+
+    uses_q31_ramp = any(lfo.rate_param_idx is not None for lfo in lfo_specs)
+    pre_lines: List[str] = ["    {"]
+    body_lines: List[str] = []
+    if uses_q31_ramp:
+        pre_lines.extend(
+            [
+                "        volatile int32_t *i_dst = (ctx[9] && ctx[10]) ? *(volatile int32_t * const *)ctx[9] : (volatile int32_t *)0;",
+                "        const int32_t * restrict i_buf = (const int32_t * restrict)ctx[10];",
+            ]
+        )
+        body_lines.append("            if (i_dst) *i_dst = i_buf[i0];")
+    post_lines: List[str] = []
+
+    for gid, group_lfos in groups.items():
+        rep = group_lfos[0]
+        pre_lines.append(f"        uint32_t ph_{gid} = st_lfo_ph_{gid};")
+        post_lines.append(f"        st_lfo_ph_{gid} = ph_{gid};")
+        needs_prev = any(l.shape == "sh" for l in group_lfos)
+        if rep.rate_param_idx is not None:
+            pmacro = params[rep.rate_param_idx].c_macro_name
+            inc_rhs = f"(uint32_t)icoef[{pmacro}]"
+        else:
+            rc = rewrite_c_divisions_and_math(replace_dsp_refs(rep.rate_expr or "1.0f"))
+            pre_lines.append(
+                f"        uint32_t inc_{gid} = (uint32_t)(int32_t)sh_maxf(0.0f, ({rc}) * 97391.548f);"
+            )
+            inc_rhs = f"inc_{gid}"
+        if needs_prev:
+            body_lines.append(f"            uint32_t prev_ph_{gid} = ph_{gid};")
+        body_lines.append(f"            ph_{gid} += {inc_rhs};")
+
+        for lfo in group_lfos:
+            lid = lfo.lfo_id
+            if lfo.phase_expr is not None:
+                pe = rewrite_c_divisions_and_math(replace_dsp_refs(lfo.phase_expr))
+                scale_c = "683565275.576f" if lfo.phase_is_radians else "4294967296.0f"
+                p_expr = f"(ph_{gid} + (uint32_t)((int32_t)(({pe}) * {scale_c})))"
+            elif lfo.phase_offset_u32:
+                p_expr = f"(ph_{gid} + 0x{lfo.phase_offset_u32:08x}u)"
+            else:
+                p_expr = f"ph_{gid}"
+
+            if lfo.shape == "sawpos":
+                body_lines.append(
+                    f"            {lfo.buf_name}[i0] = (float)(int32_t)({p_expr} >> 8) * (1.0f / 16777216.0f);"
+                )
+            elif lfo.shape == "saw":
+                body_lines.append(
+                    f"            {lfo.buf_name}[i0] = (float)(int32_t)({p_expr} >> 8) * (1.0f / 8388608.0f) - 1.0f;"
+                )
+            elif lfo.shape == "trianglepos":
+                body_lines.append(f"            {{")
+                body_lines.append(f"                int32_t _s = (int32_t){p_expr};")
+                body_lines.append(f"                uint32_t _t = (_s < 0) ? (0u - (uint32_t)_s) : (uint32_t)_s;")
+                body_lines.append(f"                {lfo.buf_name}[i0] = (float)(int32_t)(_t >> 8) * (1.0f / 8388608.0f);")
+                body_lines.append(f"            }}")
+            elif lfo.shape == "triangle":
+                body_lines.append(f"            {{")
+                body_lines.append(f"                int32_t _s = (int32_t)({p_expr} + 0x40000000u);")
+                body_lines.append(f"                uint32_t _t = (_s < 0) ? (0u - (uint32_t)_s) : (uint32_t)_s;")
+                body_lines.append(f"                {lfo.buf_name}[i0] = 1.0f - (float)(int32_t)(_t >> 8) * (1.0f / 4194304.0f);")
+                body_lines.append(f"            }}")
+            elif lfo.shape == "squarewavepos":
+                body_lines.append(
+                    f"            {lfo.buf_name}[i0] = ({p_expr} < 0x80000000u) ? 1.0f : 0.0f;"
+                )
+            elif lfo.shape == "squarewave":
+                body_lines.append(
+                    f"            {lfo.buf_name}[i0] = ({p_expr} < 0x80000000u) ? 1.0f : -1.0f;"
+                )
+            elif lfo.shape in ("sin", "cos"):
+                p_sin = f"({p_expr} + 0x40000000u)" if lfo.shape == "cos" else p_expr
+                body_lines.append(f"            {{")
+                body_lines.append(f"                float _x = (float)((int32_t){p_sin} >> 8) * (1.0f / 8388608.0f);")
+                body_lines.append(f"                float _y = 4.0f * _x * (1.0f - sh_fabsf(_x));")
+                body_lines.append(f"                {lfo.buf_name}[i0] = _y * (0.225f * sh_fabsf(_y) + 0.775f);")
+                body_lines.append(f"            }}")
+            elif lfo.shape == "sh":
+                pre_lines.append(f"        uint32_t rng_{lid} = st_lfo_rng_{lid};")
+                pre_lines.append(f"        float hold_{lid} = st_lfo_hold_{lid};")
+                post_lines.append(f"        st_lfo_rng_{lid} = rng_{lid};")
+                post_lines.append(f"        st_lfo_hold_{lid} = hold_{lid};")
+                body_lines.append(f"            if (ph_{gid} < prev_ph_{gid} || rng_{lid} == 0u) {{")
+                body_lines.append(f"                rng_{lid} = rng_{lid} * 1664525u + 1013904223u;")
+                body_lines.append(f"                hold_{lid} = (float)((int32_t)(rng_{lid} >> 8)) * (1.0f / 8388608.0f);")
+                body_lines.append(f"            }}")
+                body_lines.append(f"            {lfo.buf_name}[i0] = hold_{lid};")
+
+    return "\n".join(
+        ["    /* ---- 4b. Stock-style Q31 LFO Loop 1 (16 frames, ctx[9..10]) ------- */"]
+        + buf_decls
+        + pre_lines
+        + [
+            "#ifdef __TI_COMPILER_VERSION__",
+            "#pragma MUST_ITERATE(SH_FRAMES, SH_FRAMES)",
+            "#pragma UNROLL(1)",
+            "#endif",
+            "        for (i0 = 0; i0 < SH_FRAMES; i0++) {",
+        ]
+        + body_lines
+        + ["        }"]
+        + post_lines
+        + ["    }"]
+    )
 
 
 def _emit_c674x_kernel_from_parts(
@@ -34,13 +157,26 @@ def _emit_c674x_kernel_from_parts(
     sdram_arrays: Optional[List[Tuple[str, str, int]]] = None,
     init_const_lines: Optional[List[str]] = None,
     bpm_var_name: Optional[str] = None,
+    lfo_specs: Optional[List[LfoSpec]] = None,
 ) -> Tuple[str, int, List[FaustParam]]:
     """
     Assembles the complete, self-contained C674x C kernel source file.
     Operates directly on `instance[2]` with zero stack-struct duplication,
     zero 64-bit `double` constants, first-block smoother snap, and full NaN guards.
     """
-    all_state_vars = list(state_vars) + [("uint32_t", "init_magic", 1)]
+    lfo_list = list(lfo_specs or [])
+    lfo_state_vars: List[Tuple[str, str, int]] = []
+    seen_lfo_groups: set[int] = set()
+    for lfo in lfo_list:
+        if lfo.phase_group_id not in seen_lfo_groups:
+            seen_lfo_groups.add(lfo.phase_group_id)
+            lfo_state_vars.append(("uint32_t", f"lfo_ph_{lfo.phase_group_id}", 1))
+        if lfo.shape == "sh":
+            lfo_state_vars.append(("uint32_t", f"lfo_rng_{lfo.lfo_id}", 1))
+            lfo_state_vars.append(("float", f"lfo_hold_{lfo.lfo_id}", 1))
+
+    all_dsp_state_vars = list(state_vars) + lfo_state_vars
+    all_state_vars = all_dsp_state_vars + [("uint32_t", "init_magic", 1)]
     total_words = sum(alen for _, _, alen in all_state_vars)
 
     if total_words * 4 > MAX_STATE_BYTES:
@@ -98,7 +234,7 @@ def _emit_c674x_kernel_from_parts(
                     c_lines.append(f"{indent}pstate->{vname}[{k}] = st_{vname}_{k};")
         return u_lines, s_lines, c_lines
 
-    unpack_lines, scrub_lines, commit_lines = _build_state_io_lines(state_vars, "    ")
+    unpack_lines, scrub_lines, commit_lines = _build_state_io_lines(all_dsp_state_vars, "    ")
     sdram_arr_list = list(sdram_arrays or [])
     sdram_arr_names = {vname for _, vname, _ in sdram_arr_list}
 
@@ -117,9 +253,22 @@ def _emit_c674x_kernel_from_parts(
     coef_load_lines = ["    float fade = coef[SH_COEFF_BYPASS];"]
     coef_check_lines = ["    if (!(fade >= 0.0f && fade <= 1.0f)) ok = 0u;"]
     slider_map_lines = []
+    raw_decls: List[str] = []
+    raw_loads: List[str] = []
 
     for idx, p in enumerate(params):
+        if p.is_q31_lfo_rate:
+            cvar = f"raw_i{idx}"
+            raw_decls.append(f"    int32_t {cvar} = 0;")
+            raw_loads.append(f"        {cvar} = icoef[{p.c_macro_name}];")
+            coef_check_lines.append(f"    if (!({cvar} >= 0 && {cvar} <= 0x20000000)) ok = 0u;")
+            slider_map_lines.append(
+                f"    float {p.var_name} = (float){cvar} * 1.0267831e-5f; (void){p.var_name};"
+            )
+            continue
         cvar = f"raw_p{idx}"
+        raw_decls.append(f"    float {cvar} = 0.0f;")
+        raw_loads.append(f"        {cvar} = coef[{p.c_macro_name}];")
         coef_load_lines.append(f"    float {cvar} = coef[{p.c_macro_name}];")
         if p.is_stock_vol:
             coef_check_lines.append(f"    if (!({cvar} >= 0.0f && {cvar} <= 1.6f)) ok = 0u;")
@@ -142,7 +291,7 @@ def _emit_c674x_kernel_from_parts(
                 )
 
     if bpm_var_name:
-        slider_map_lines.append("    float host_qtr_ms = coef[SH_COEFF_BPM];")
+        slider_map_lines.append("    float host_qtr_ms = coef[15];")
         slider_map_lines.append(
             "    if (!(host_qtr_ms >= 150.0f && host_qtr_ms <= 2000.0f)) host_qtr_ms = 500.0f;"
         )
@@ -293,6 +442,82 @@ def _emit_c674x_kernel_from_parts(
     if meta.footswitch is not None:
         coef_check_lines.append("    if (!(fsw_unlatch >= 0.0f && fsw_unlatch <= 1.0f)) ok = 0u;")
 
+    lfo_loop1_c = _build_lfo_loop1_c(lfo_list, params, replace_dsp_refs)
+    has_icoef = any(p.is_q31_lfo_rate for p in params)
+    icoef_decl = (
+        "    const int32_t * restrict icoef = (const int32_t * restrict)instance[1];\n"
+        if has_icoef else ""
+    )
+
+    edit_c_blocks = []
+    for p in params:
+        if p.time_sync and bpm_var_name:
+            ts = p.time_sync
+            steps = (int(ts["max_ms"]) - int(ts["min_ms"])) + len(ts["notes"])
+            edit_c_blocks.append(
+                f"void {p.c_edit_macro_name}(int click, float *coeff, void **ctx, int slot)\n"
+                f"{{\n"
+                f"    coeff[slot] = (float)click * (1.0f / {steps}.0f);\n"
+                f"    int qtr_ms = sh_note_to_ms(ctx, 6, 4000);\n"
+                f"    if (qtr_ms > 0) coeff[15] = (float)qtr_ms;\n"
+                f"}}\n"
+            )
+        elif p.lfo_sync:
+            ls = p.lfo_sync
+            min_dhz = int(ls["min_dhz"])
+            max_dhz = int(ls["max_dhz"])
+            step_dhz = int(ls.get("step_dhz", 1))
+            hz_max_click = (max_dhz - min_dhz) // step_dhz
+            note_start = hz_max_click + 1
+            edit_c_blocks.append(
+                f"void {p.c_edit_macro_name}(int click, float *coeff, void **ctx, int slot)\n"
+                f"{{\n"
+                f"    int32_t *icoeff = (int32_t *)coeff;\n"
+                f"    float hz;\n"
+                f"    if (click <= {hz_max_click}) {{\n"
+                f"        hz = (float)({min_dhz} + click * {step_dhz}) * 0.1f;\n"
+                f"    }} else {{\n"
+                f"        int nidx = click - {note_start};\n"
+                f"        int ms = 500;\n"
+                f"        if (nidx == 0) {{\n"
+                f"            int s16 = sh_note_to_ms(ctx, 0, 4000);\n"
+                f"            if (s16 > 1) ms = s16 >> 1;\n"
+                f"        }} else {{\n"
+                f"            int synced = sh_note_to_ms(ctx, nidx - 1, 4000);\n"
+                f"            if (synced > 0) ms = synced;\n"
+                f"        }}\n"
+                f"        hz = sh_fdiv(1000.0f, (float)ms);\n"
+                f"    }}\n"
+                f"    int32_t inc_q31 = (int32_t)(hz * 97391.548f);\n"
+                f"    if (inc_q31 < 0) inc_q31 = 0;\n"
+                f"    sh_smooth_i32(ctx, &icoeff[slot], inc_q31, 0x003deb7d);\n"
+                f"}}\n"
+            )
+        elif p.is_q31_lfo_rate:
+            steps = int(round((p.max_val - p.min_val) / p.step)) if p.step > 0 else 100
+            if steps < 1 or steps > 255:
+                steps = 100
+            span = p.max_val - p.min_val
+            if p.scale == "log" and p.min_val > 0.0 and p.max_val > p.min_val:
+                ln_ratio = math.log(p.max_val / p.min_val)
+                hz_line = f"    float hz = {p.min_val:.6f}f * sh_expf(norm * {ln_ratio:.6f}f);"
+            elif p.scale == "exp":
+                hz_line = f"    float hz = {p.min_val:.6f}f + (norm * norm) * {span:.6f}f;"
+            else:
+                hz_line = f"    float hz = {p.min_val:.6f}f + norm * {span:.6f}f;"
+            edit_c_blocks.append(
+                f"void {p.c_edit_macro_name}(int click, float *coeff, void **ctx, int slot)\n"
+                f"{{\n"
+                f"    int32_t *icoeff = (int32_t *)coeff;\n"
+                f"    float norm = (float)click * (1.0f / {steps}.0f);\n"
+                f"{hz_line}\n"
+                f"    int32_t inc_q31 = (int32_t)(hz * 97391.548f);\n"
+                f"    if (inc_q31 < 0) inc_q31 = 0;\n"
+                f"    sh_smooth_i32(ctx, &icoeff[slot], inc_q31, 0x003deb7d);\n"
+                f"}}\n"
+            )
+    edit_c_section = ("\n" + "\n".join(edit_c_blocks)) if edit_c_blocks else ""
+
     kernel_c = f"""/* Auto-generated by tools/faust2zd2.py from FAUST DSP specification.
  * Effect: {meta.name} ({meta.filename}.ZD2, ID 0x{meta.effect_id})
  * Target: Zoom MS Plus (TI TMS320C674x bare-metal DSP, 44.1 kHz, 0 CALL, 0 B14)
@@ -310,7 +535,7 @@ typedef float FAUSTFLOAT;
 typedef struct {{
 {chr(10).join(f"    {ctype} {vname}" + (f"[{alen}];" if alen > 1 else ";") for ctype, vname, alen in all_state_vars)}
 }} faust_zd2_state_t;
-
+{edit_c_section}
 void SH_AUDIO_FN(void **instance, void **ctx)
 {{
     int i0;
@@ -319,7 +544,7 @@ void SH_AUDIO_FN(void **instance, void **ctx)
     if (!eff) return;
 
     const float * restrict coef = (const float * restrict)instance[1];
-    faust_zd2_state_t * restrict pstate = (faust_zd2_state_t * restrict)instance[2];
+{icoef_decl}    faust_zd2_state_t * restrict pstate = (faust_zd2_state_t * restrict)instance[2];
 
     /* ---- 1. Mandatory fail-closed guard prologue (SAFETY.md) ----------- */
     unsigned ok = (coef != 0 && pstate != 0) ? 1u : 0u;
@@ -328,10 +553,10 @@ void SH_AUDIO_FN(void **instance, void **ctx)
         ok = 0u;
 #endif
     float fade = 0.0f;
-{fsw_decl}{chr(10).join(f"    float raw_p{idx} = 0.0f;" for idx in range(len(params)))}
+{fsw_decl}{chr(10).join(raw_decls)}
     if (ok) {{
         fade = coef[SH_COEFF_BYPASS];
-{fsw_load}{chr(10).join(f"        raw_p{idx} = coef[{p.c_macro_name}];" for idx, p in enumerate(params))}
+{fsw_load}{chr(10).join(raw_loads)}
 {chr(10).join("    " + line for line in coef_check_lines)}
     }}
 {chr(10).join(sdram_guard_lines)}
@@ -356,6 +581,8 @@ void SH_AUDIO_FN(void **instance, void **ctx)
 {chr(10).join(smoo_lines)}
     {pre_loop_clean}
 
+{lfo_loop1_c}
+
 {loop_section_c}
 
     /* ---- 6. Commit register state back to instance[2] ------------------ */
@@ -377,20 +604,34 @@ def build_manifest_dict(
         if p.time_sync:
             ts = p.time_sync
             steps = (int(ts["max_ms"]) - int(ts["min_ms"])) + len(ts["notes"])
-        elif p.is_stock_vol and not p.values:
-            steps = 100
+            default_click = max(0, min(steps, int(round(p.init))))
+        elif p.lfo_sync:
+            ls = p.lfo_sync
+            min_dhz = int(ls["min_dhz"])
+            max_dhz = int(ls["max_dhz"])
+            step_dhz = int(ls.get("step_dhz", 1))
+            hz_max_click = (max_dhz - min_dhz) // step_dhz
+            steps = hz_max_click + len(ls["notes"])
+            init_dhz = int(round(p.init * 10.0))
+            if min_dhz <= init_dhz <= max_dhz:
+                default_click = (init_dhz - min_dhz) // step_dhz
+            else:
+                default_click = max(0, min(steps, int(round(p.init))))
         else:
-            steps = int(round((p.max_val - p.min_val) / p.step)) if p.step > 0 else 100
-            if steps < 1 or steps > 255:
+            if p.is_stock_vol and not p.values:
                 steps = 100
-        if p.scale == "log" and p.min_val > 0.0 and p.max_val > p.min_val and p.init >= p.min_val:
-            norm_init = math.log(p.init / p.min_val) / math.log(p.max_val / p.min_val)
-        elif p.scale == "exp" and p.max_val > p.min_val and p.init >= p.min_val:
-            norm_init = math.sqrt((p.init - p.min_val) / (p.max_val - p.min_val))
-        else:
-            norm_init = (p.init - p.min_val) / (p.max_val - p.min_val) if p.max_val > p.min_val else 0.0
-        default_click = int(round(norm_init * steps))
-        default_click = max(0, min(steps, default_click))
+            else:
+                steps = int(round((p.max_val - p.min_val) / p.step)) if p.step > 0 else 100
+                if steps < 1 or steps > 255:
+                    steps = 100
+            if p.scale == "log" and p.min_val > 0.0 and p.max_val > p.min_val and p.init >= p.min_val:
+                norm_init = math.log(p.init / p.min_val) / math.log(p.max_val / p.min_val)
+            elif p.scale == "exp" and p.max_val > p.min_val and p.init >= p.min_val:
+                norm_init = math.sqrt((p.init - p.min_val) / (p.max_val - p.min_val))
+            else:
+                norm_init = (p.init - p.min_val) / (p.max_val - p.min_val) if p.max_val > p.min_val else 0.0
+            default_click = int(round(norm_init * steps))
+            default_click = max(0, min(steps, default_click))
 
         unit_str = f" {p.unit}" if p.unit else ""
         desc = p.explanation or (
@@ -413,7 +654,14 @@ def build_manifest_dict(
             if p.is_stock_vol:
                 entry["curve"] = "stock_vol"
             if p.time_sync:
+                if meta.reads_bpm:
+                    entry["bpm_sync"] = True
                 entry["time_sync"] = p.time_sync
+            if p.lfo_sync:
+                entry["bpm_sync"] = True
+                entry["lfo_sync"] = p.lfo_sync
+            elif p.is_q31_lfo_rate:
+                entry["q31_default"] = int(round(p.init * 97391.548)) & 0xFFFFFFFF
         manifest_params.append(entry)
 
     if meta.footswitch is not None:
@@ -447,8 +695,6 @@ def build_manifest_dict(
     }
     if meta.footswitch is not None:
         m["footswitch"] = meta.footswitch
-    if meta.reads_bpm:
-        m["reads_bpm"] = True
     if meta.author:
         m["author"] = meta.author
     return m

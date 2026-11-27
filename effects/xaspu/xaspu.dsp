@@ -64,10 +64,10 @@ spu_interp(h0, h1, h2, h3, t) = out_lin + lin_to_gauss * (gauss - out_lin)
     };
 
 // ---- 5. Real-Time Sony SPU 4-Bit XA ADPCM Voice State Machine (`~` 8-wire state) ----
-spu_voice_step(ph, p1, p2, env, h0, h1, h2, h3, x_in) =
+spu_voice_step(ph, p1, p2, env, h0, h1, h2, h3, r_step, x_in) =
     next_ph, next_p1, next_p2, next_env, next_h0, next_h1, next_h2, next_h3, interp_out
     with {
-        ph_sum     = ph + rate_step;
+        ph_sum     = ph + r_step;
         tk         = ba.if(ph_sum >= 1.0, 1.0, 0.0);
         next_ph    = ph_sum - tk;
 
@@ -96,18 +96,28 @@ spu_voice_step(ph, p1, p2, env, h0, h1, h2, h3, x_in) =
         interp_out = spu_interp(next_h0, next_h1, next_h2, next_h3, next_ph);
     };
 
-spu_voice(x) = (spu_voice_step(x) ~ (_, _, _, _, _, _, _, _)) : !, !, !, !, !, !, !, !, _;
+spu_voice(r_step, x) = (spu_voice_step(r_step, x) ~ (_, _, _, _, _, _, _, _)) : !, !, !, !, !, !, !, !, _;
 
 // ---- Per-Channel SPU Voice Pipeline ----
-spu_channel(x_st) =
+spu_channel(r_step, x_st) =
     zm_ema(k_post,
         spu_voice(
+            r_step,
             zm_ema(k_pre, zm_ema(k_pre, x_st))
         )
     ) * out_gain;
 
-// ---- 512 KB RAM-Budget Mid/Side Stereo Width + Dual SPU Voice Processing ----
-process(xL, xR) = spu_channel(st_l), spu_channel(st_r)
+// ---- 512 KB RAM-Budget Mid/Side Stereo Width + Dual-Voice Pitch-Register Spread ----
+// At Width=0: collapses cleanly to mono with identical L/R voice clocks.
+// At Width>0: preserves Mid/Side stereo AND applies subtle opposing L/R SPU clock
+// micro-spread via Loop 1 Q31 LFO so even mono guitar inputs gain dual-voice stereo width.
+width_mod_amt = rate_step * width_knob * 0.008;
+rate_base     = min(1.0 - width_mod_amt, rate_step);
+width_delta   = zm_osc(0.31) * width_mod_amt;
+rate_l        = rate_base + width_delta;
+rate_r        = rate_base - width_delta;
+
+process(xL, xR) = spu_channel(rate_l, st_l), spu_channel(rate_r, st_r)
     with {
         mid_s  = 0.5 * (xL + xR);
         side_s = 0.5 * (xL - xR) * width_knob;

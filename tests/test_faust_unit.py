@@ -606,6 +606,78 @@ class TestFaustCBackendConverter(unittest.TestCase):
                 self.assertTrue(math.isfinite(s))
             self.assertGreater(sum(s * s for s in out_l), 1e-3)
 
+    def test_zoom_q31_lfo_and_lfo_sync(self) -> None:
+        """
+        Verify stock-style Q31 LFOs (`zm_osc`, `zm_osccos`, `zm_lf_triangle`,
+        `zm_lf_sh`, etc.) + `[zoom:lfo_sync]` / `[lfo_sync:...]` lower to:
+          - Loop 1 streaming `ctx[9..10]` with shared `uint32_t lfo_ph_0`
+          - `SH_EDIT_RATE` using `sh_smooth_i32` & `sh_note_to_ms`
+          - `manifest.json` with `bpm_sync: true` & `lfo_sync` Hz/note config
+          - Accurate quadrature output when executed natively in `KernelHarness`
+        """
+        dsp_text = """
+        declare name "LfoQuad";
+        declare zd2_filename "XXLFOQ";
+        declare zd2_id "070011fa";
+        import("stdfaust.lib");
+        import("zoom.lib");
+
+        rate  = hslider("Rate[1][zoom:lfo_sync]", 2.0, 0.1, 10.0, 0.1);
+        depth = hslider("Depth[2]", 1.0, 0.0, 1.0, 0.01);
+
+        s = zm_osc(rate);
+        c = zm_osccos(rate);
+        process(l, r) = l * (0.5 + 0.5 * depth * s), r * (0.5 + 0.5 * depth * c);
+        """
+        meta, params = parse_faust_dsp_metadata(dsp_text)
+        self.assertEqual(len(params), 2)
+        self.assertIsNotNone(params[0].lfo_sync)
+        self.assertEqual(params[0].lfo_sync["min_dhz"], 1)
+        self.assertEqual(params[0].lfo_sync["max_dhz"], 100)
+        self.assertEqual(params[0].lfo_sync["step_dhz"], 1)
+        self.assertIn("1/32", params[0].lfo_sync["notes"])
+        self.assertIn("1/4", params[0].lfo_sync["notes"])
+
+        comp = FaustSubsetCompiler(dsp_text, meta, params, search_dirs=[ROOT / "effects"])
+        kernel_c, state_bytes, out_params = comp.compile()
+        manifest = build_manifest_dict(meta, out_params, "lfoquad.c", state_bytes)
+
+        # Verify Loop 1, Q31 ramp stream, shared phase accumulator, and edit handler
+        self.assertIn("Stock-style Q31 LFO Loop 1", kernel_c)
+        self.assertIn("ctx[9]", kernel_c)
+        self.assertIn("ctx[10]", kernel_c)
+        self.assertIn("uint32_t lfo_ph_0;", kernel_c)
+        self.assertNotIn("lfo_ph_1", kernel_c)  # zm_osc + zm_osccos share ONE phase accumulator
+        self.assertIn("void SH_EDIT_RATE(", kernel_c)
+        self.assertIn("sh_smooth_i32(", kernel_c)
+        self.assertIn("sh_note_to_ms(", kernel_c)
+
+        rate_entry = manifest["params"][0]
+        self.assertTrue(rate_entry["bpm_sync"])
+        self.assertEqual(rate_entry["lfo_sync"]["min_dhz"], 1)
+        self.assertEqual(rate_entry["lfo_sync"]["max_dhz"], 100)
+        self.assertEqual(rate_entry["default"], 19)  # (2.0 - 0.1) / 0.1 = 19
+        self.assertEqual(rate_entry["max"], 109)     # 99 Hz clicks + 10 note divisions
+
+        # Run natively in KernelHarness with DC=1.0 input to read out LFO waveforms directly
+        with KernelHarness(kernel_c, manifest) as h:
+            dc = [1.0] * SH_FRAMES
+            s_vals: list[float] = []
+            c_vals: list[float] = []
+            # Run 0.5 s (~1378 blocks @ 2.0 Hz = 1 full cycle)
+            for _ in range(1400):
+                ol, or_ = h.run_block(dc, dc)
+                s_vals.extend((v - 0.5) * 2.0 for v in ol)
+                c_vals.extend((v - 0.5) * 2.0 for v in or_)
+            self.assertGreater(max(s_vals), 0.98)
+            self.assertLess(min(s_vals), -0.98)
+            self.assertGreater(max(c_vals), 0.98)
+            self.assertLess(min(c_vals), -0.98)
+            # Quadrature identity: sin^2 + cos^2 ~= 1 everywhere
+            r2 = [sv * sv + cv * cv for sv, cv in zip(s_vals[::64], c_vals[::64])]
+            self.assertGreater(min(r2), 0.97)
+            self.assertLess(max(r2), 1.03)
+
 
 if __name__ == "__main__":
     unittest.main()

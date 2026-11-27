@@ -35,6 +35,7 @@ from .models import (
     FaustMemoryReport,
     FaustMeta,
     FaustParam,
+    LfoSpec,
     parse_faust_dsp_metadata,
     strip_c_comments,
 )
@@ -103,6 +104,8 @@ class FaustSubsetCompiler:
         self.delay_wpos_var: Optional[str] = None
         self.delay_line_count: int = 0
         self.delay_line_len: int = 1024
+        self.lfo_specs: List[LfoSpec] = []
+        self._lfo_phase_groups: Dict[Tuple[Optional[int], Optional[str]], int] = {}
         self.delay_lines_map: Dict[str, int] = {}
         self.delay_line_requested_lens: Dict[int, int] = {}
         self.delay_line_owners: Dict[int, str] = {}
@@ -249,12 +252,104 @@ class FaustSubsetCompiler:
                 seen.add(fname)
                 lib_text = strip_c_comments(found_path.read_text(encoding="utf-8"))
                 lib_text = re.sub(r"\bzm_(?:fsw_active|is_unlatch|bpm)\s*=\s*[^;]+;", "", lib_text)
+                lib_text = re.sub(
+                    r"\bzm_(?:lf_sawpos|lf_sawpos_phase|lf_saw|lf_trianglepos|lf_triangle"
+                    r"|lf_squarewavepos|lf_squarewave|osc|osccos|oscp|lf_sh)\s*\([^)]*\)\s*=\s*[^;]+;",
+                    "",
+                    lib_text,
+                )
+                lib_text = re.sub(
+                    r"\bzm_lfo_sync_hz\s*\([^)]*\)\s*=\s*.*?\bwith\s*\{[^}]*\}\s*;",
+                    "",
+                    lib_text,
+                    flags=re.S,
+                )
                 text = text[: m.start()] + "\n" + lib_text + "\n" + text[m.end() :]
                 changed = True
                 break
             if not changed:
                 break
         return text
+
+    def _alloc_q31_lfo(
+        self,
+        shape: str,
+        freq_c: str,
+        phase_c: Optional[str] = None,
+        phase_is_radians: bool = False,
+    ) -> str:
+        """Allocate a stock-style Q31 LFO buffer in Loop 1, sharing phase accumulators by rate."""
+        cleaned = freq_c.strip()
+        while cleaned.startswith("(") and cleaned.endswith(")"):
+            inner = cleaned[1:-1].strip()
+            depth = 0
+            balanced = True
+            for ch in inner:
+                if ch == "(":
+                    depth += 1
+                elif ch == ")":
+                    depth -= 1
+                    if depth < 0:
+                        balanced = False
+                        break
+            if balanced and depth == 0:
+                cleaned = inner
+            else:
+                break
+
+        # Unwrap hoisted block-rate aliases (e.g. `k_rate_hz_15` -> `fHslider1`)
+        resolved = cleaned
+        for _ in range(4):
+            nxt = self._pre_var_to_expr.get(resolved)
+            if not nxt:
+                break
+            resolved = nxt.strip("() ")
+
+        rate_param_idx: Optional[int] = None
+        rate_expr: Optional[str] = cleaned
+        for idx, p in enumerate(self.params):
+            if resolved in (p.var_name, f"dsp->{p.var_name}"):
+                rate_param_idx = idx
+                rate_expr = None
+                p.is_q31_lfo_rate = True
+                break
+
+        group_key = (rate_param_idx, rate_expr)
+        if group_key in self._lfo_phase_groups:
+            gid = self._lfo_phase_groups[group_key]
+        else:
+            gid = len(self._lfo_phase_groups)
+            self._lfo_phase_groups[group_key] = gid
+
+        phase_offset_u32 = 0
+        phase_expr: Optional[str] = None
+        if phase_c is not None:
+            p_str = phase_c.strip().rstrip("fF")
+            try:
+                p_val = float(p_str)
+                if phase_is_radians:
+                    phase_offset_u32 = int(round((p_val / (2.0 * math.pi)) * 4294967296.0)) & 0xFFFFFFFF
+                else:
+                    phase_offset_u32 = int(round(p_val * 4294967296.0)) & 0xFFFFFFFF
+            except ValueError:
+                phase_expr = phase_c
+
+        lid = len(self.lfo_specs)
+        buf_name = f"sh_lfo_{lid}"
+        self.lfo_specs.append(
+            LfoSpec(
+                lfo_id=lid,
+                phase_group_id=gid,
+                shape=shape,
+                buf_name=buf_name,
+                rate_param_idx=rate_param_idx,
+                rate_expr=rate_expr,
+                phase_offset_u32=phase_offset_u32,
+                phase_expr=phase_expr,
+                phase_is_radians=phase_is_radians,
+            )
+        )
+        return f"{buf_name}[i0]"
 
     def ensure_delay_wpos(self) -> str:
         if self.delay_wpos_var is None:
@@ -427,6 +522,7 @@ class FaustSubsetCompiler:
             delay_step_expr=self.delay_step_expr,
             delay_line_len=self.delay_line_len,
             bpm_var_name="host_bpm" if self.meta.reads_bpm else None,
+            lfo_specs=self.lfo_specs,
         )
 
     def _expand_pattern_macros(self, text: str) -> str:
@@ -511,7 +607,7 @@ class FaustSubsetCompiler:
         """True if `c_expr` depends only on sliders/smoothed parameters and constants (not audio samples)."""
         return not bool(
             re.search(
-                r"\b(in0|in1|fTmp_|fWith_|fSig_|fSplit_|fSvf|fEnv|fRms|fComp|fGate|fLag|fTf|fComb|fPipe|fSlew|fOvs|fAp|fDel|fLatch|fRec_|fRecNext_|fRecOut_|fNoi_)\w*\b|dsp->(?!fSmoo_|fDrift_|fPink)\w+",
+                r"\b(in0|in1|sh_lfo_|fTmp_|fWith_|fSig_|fSplit_|fSvf|fEnv|fRms|fComp|fGate|fLag|fTf|fComb|fPipe|fSlew|fOvs|fAp|fDel|fLatch|fRec_|fRecNext_|fRecOut_|fNoi_)\w*\b|dsp->(?!fSmoo_|fDrift_|fPink)\w+",
                 c_expr,
             )
         )
@@ -1609,6 +1705,37 @@ class FaustSubsetCompiler:
                     else:
                         out_expr = f"(fSvfIn_{uid} + ({g_c}) * dsp->{rec_bp})"
                     expr = expr[:start] + out_expr + expr[end:]
+
+            while True:
+                m = self._find_call(expr, "zm_lfo_sync_hz")
+                if not m:
+                    break
+                start, end, args = m
+                click_c = expand_expr(args[0], env, ch_suffix)
+                expr = expr[:start] + click_c + expr[end:]
+
+            for zm_lfo_fn, lfo_shape, has_phase, phase_rad in (
+                ("zm_lf_sawpos_phase", "sawpos", True, False),
+                ("zm_lf_sawpos", "sawpos", False, False),
+                ("zm_lf_saw", "saw", False, False),
+                ("zm_lf_trianglepos", "trianglepos", False, False),
+                ("zm_lf_triangle", "triangle", False, False),
+                ("zm_lf_squarewavepos", "squarewavepos", False, False),
+                ("zm_lf_squarewave", "squarewave", False, False),
+                ("zm_oscp", "sin", True, True),
+                ("zm_osccos", "cos", False, False),
+                ("zm_osc", "sin", False, False),
+                ("zm_lf_sh", "sh", False, False),
+            ):
+                while True:
+                    m = self._find_call(expr, zm_lfo_fn)
+                    if not m:
+                        break
+                    start, end, args = m
+                    freq_c = expand_expr(args[0], env, ch_suffix)
+                    phase_c = expand_expr(args[1], env, ch_suffix) if (has_phase and len(args) > 1) else None
+                    out_e = self._alloc_q31_lfo(lfo_shape, freq_c, phase_c, phase_is_radians=phase_rad)
+                    expr = expr[:start] + out_e + expr[end:]
 
             for osc_fn, is_cos in (("os.osc", False), ("os.oscsin", False), ("os.osccos", True)):
                 while True:
